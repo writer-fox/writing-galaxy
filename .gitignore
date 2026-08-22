@@ -1,0 +1,16 @@
+# Reasonix 工具内部状态（含会话元数据，不提交）
+.reasonix/
+
+# 系统文件
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# 编辑器/IDE
+.vscode/
+.idea/
+*.swp
+
+# 日志与临时文件
+*.log
+tmp/
