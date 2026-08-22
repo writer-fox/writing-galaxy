@@ -247,36 +247,64 @@
 
 ---
 
-## 7. 目录结构与落地（Vue3 实现指引）
+## 7. 目录结构与落地（Vue3 实现）
 
-> 原型用单 HTML 演示；正式实现建议目录：
+> 前端工程已落地于 `ui/writer-app/`（Vite + Vue3 + TS + Pinia + CodeMirror 6）。目录：
 
 ```
-ui/
-  assets/tokens.css          # 双主题 CSS Custom Properties
-  components/
-    ActivityBar.vue          # 活动栏
-    WorkPanel.vue            # 作品/库
-    AiPanel.vue              # AI 交互栏
-    ExplorerTree.vue         # 内容树
-    TabBar.vue               # Tab 系统
-    EditorPane.vue           # CodeMirror 封装
-    OutlinePane.vue          # 大纲视图
-    RelationGraph.vue        # 3d-force-graph 封装
-    TimeScrubber.vue         # 时间轴 scrubber
-    ArchiveDrawer.vue        # 档案抽屉
-    StatusBar.vue
-    BaseModal.vue / BaseMenu.vue
+ui/writer-app/
+  package.json · vite.config.ts · tsconfig*.json · index.html
+  src/
+    styles/tokens.css          # 双主题 CSS Custom Properties + 语义色/图色板
+    styles/base.css            # 重置 / 字体 / 滚动条 / 拖拽全局态
+    stores/theme.ts            # 主题切换（persist 到 localStorage）
+    stores/tabs.ts             # Tab 系统：openTabs / activeKey / 幂等open / 拖拽reorder
+    stores/data.ts             # 示例数据：章节(sort_order)/大纲/设定，类型对齐方案 4.2
+    composables/layout.ts      # 分栏拖拽 resize
+    components/
+      ActivityBar.vue          # 活动栏（含主题切换）
+      AiPanel.vue              # AI 交互栏
+      WorkPane.vue             # 工作区：tab + 面包屑 + 面板分发
+      TabBar.vue               # 顶栏 tab（点击切换 + 拖拽排序）
+      Explorer.vue             # 内容树（章节/大纲/关系图/设定）
+      StatusBar.vue            # 状态栏
+      CodeMirrorEditor.vue     # CodeMirror 6 封装（markdown、随主题 reconfigure）
+      panes/EditorPane.vue     # 章节编辑器页
+      panes/OutlinePane.vue    # 大纲视图
+      panes/GraphPane.vue      # 3D 关系图（当前 SVG 占位 + 时间轴 scrubber）
 ```
 
-**落地转换要点**：原型内的 CSS 变量即 tokens；组件结构对应上文；3D 区在原型中先用静态 canvas/占位图示意，正式实现接入 `3d-force-graph`（方案 3.2）。
+> 备注：关系图当前用 SVG 占位示意，正式接入 `3d-force-graph`（方案 3.2）时替换 `panes/GraphPane.vue` 内部渲染，其余结构不变。
 
 ---
 
-## 8. 原型说明
+## 8. 双主题设计令牌
 
-`ui/prototype/index.html`：
-- **纯静态**、无依赖、直接双击打开。
-- 右上角 / 活动栏底部可切换 **亮 / 暗** 主题（持久化到 localStorage）。
+已落地于 `src/styles/tokens.css`，与第 2 节一致：`data-theme="light"` / `"dark"` 两套 CSS 变量，含界面色 + 语义色 + 关系图语义色板（rel_type 一一对应）。
+
+---
+
+## 9. 交互规范补遗（已落地）
+
+### 9.1 分栏可拖拽调整
+- 布局由 `--act-w / --ai-w / --exp-w` 三个全局 CSS 变量驱动（grid 消费）。
+- **AI 栏右缘**、**内容树左缘** 各有细拖拽手柄（hover 显青绿指示线，拖动中全页 `col-resize` 且禁选中）。
+- 范围：AI 栏 200–460px，内容树 220–520px。
+
+### 9.2 顶栏 tab
+- **单击打开/聚焦**：点未打开项开新 tab；点已打开项仅切换，不重复开（幂等）。
+- **拖拽排序**：按住 tab 拖动，半透明"被拿起"效果，实时按落点重排；位移 >5px 才判定为拖拽，普通点击不受影响。
+- 关闭当前 tab 自动聚焦相邻；全部关闭时兜底回到默认章，保证工作区不空。
+
+### 9.3 主题切换
+- 活动栏底部太阳/月亮按钮切换亮/暗，persist 到 `localStorage['wx-theme']`。
+
+---
+
+## 10. 静态原型说明
+
+`ui/prototype/index.html` 为早期静态原型（纯 HTML，无 Vite），已被 `ui/writer-app` 取代，保留作设计参照。
+- 纯静态、无依赖、双击打开。
+- 可切换亮/暗主题（persist localStorage）。
 - 交互演示：Tab 切换、点内容树开 Tab、关系图模式切换、抽屉开合、快捷入口。
-- 关系图用简化 SVG 占位呈现上帝视角节点；3D 能力留待接入库后展现。
+

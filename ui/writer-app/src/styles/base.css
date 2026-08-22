@@ -1,0 +1,56 @@
+/* ============================
+   写作星河 · 基础样式
+   ============================ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  font-size: 13px;
+  color: var(--fg);
+  background: var(--bg-workspace);
+  transition: background 0.25s ease, color 0.25s ease;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+  border-radius: 8px;
+}
+
+#app {
+  height: 100vh;
+}
+
+/* 分栏拖拽时的全局态 */
+body.col-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+body.col-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}

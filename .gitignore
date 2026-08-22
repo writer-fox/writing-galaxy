@@ -14,3 +14,23 @@ Desktop.ini
 # 日志与临时文件
 *.log
 tmp/
+
+# 本地工具（Maven 二进制等，不提交）
+.tools/
+
+# 后端构建产物与本地数据库
+backend/target/
+backend/data/
+
+# 前端依赖与构建产物
+node_modules/
+ui/writer-app/node_modules/
+ui/writer-app/dist/
+*.tsbuildinfo
+
+# 临时验证脚本（不提交）
+*.mjs
+!backend/*.mjs
+
+# Reasonix 工具配置（可能含记录的命令/token，不提交）
+reasonix.toml

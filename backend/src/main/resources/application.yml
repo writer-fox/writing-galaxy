@@ -1,0 +1,16 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: "jdbc:sqlite:data/writer.db?foreign_keys=on&journal_mode=WAL"
+    driver-class-name: org.sqlite.JDBC
+    # SQLite 不需要用户名/密码
+  sql:
+    init:
+      # 启动时执行 schema.sql（幂等）
+      mode: always
+
+logging:
+  level:
+    com.writer: info

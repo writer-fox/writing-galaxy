@@ -55,6 +55,7 @@ html[data-theme="dark"] {
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body {
+  --act-w: 48px; --ai-w: 248px; --exp-w: 264px;
   font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 13px; color: var(--fg); background: var(--bg-workspace);
   transition: background .25s ease, color .25s ease;
@@ -67,14 +68,28 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ============ App shell ============ */
 .shell {
+  position: relative;
   display: grid;
-  grid-template-columns: 48px auto 1fr auto;
+  grid-template-columns: var(--act-w) var(--ai-w) 1fr var(--exp-w);
   grid-template-rows: 1fr 24px;
   grid-template-areas:
     "activity ai work explorer"
     "status  status status status";
   height: 100vh;
 }
+
+/* ============ Column resizers ============ */
+.resizer {
+  position: absolute; top: 0; bottom: 0; width: 5px;
+  cursor: col-resize; z-index: 20; touch-action: none;
+}
+.resizer:hover::after, .resizer.dragging::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 2px; width: 1px; background: var(--accent); opacity: .6;
+}
+.r-ai  { left: calc(var(--act-w) - 3px); }
+.r-exp { right: calc(var(--exp-w) - 2px); left: auto; }
+body.col-resizing { cursor: col-resize; user-select: none; }
+body.col-resizing * { cursor: col-resize !important; user-select: none !important; }
 
 .panel { background: var(--bg-panel); transition: background .25s ease; }
 .sidebar { background: var(--bg-sidebar); transition: background .25s ease; }
@@ -84,6 +99,7 @@ button { font-family: inherit; cursor: pointer; }
   grid-area: activity; background: var(--bg-sidebar);
   display: flex; flex-direction: column; align-items: center;
   padding: 10px 0; gap: 6px; border-right: 1px solid var(--border); z-index: 5;
+  min-width: 40px; max-width: 120px;
 }
 .activity .spacer { flex: 1; }
 .icon-btn {
@@ -103,7 +119,7 @@ button { font-family: inherit; cursor: pointer; }
 .fire{
   /* ===== AI Panel ===== */
 }
-.ai-panel { grid-area: ai; width: 248px; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+.ai-panel { grid-area: ai; min-width: 200px; max-width: 420px; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
 .ai-head { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
 .ai-head .title { font-weight: 600; font-size: 12px; display: flex; align-items: center; gap: 6px; }
 .ai-head .title .dot { width: 8px; height: 8px; border-radius: 3px; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
@@ -161,6 +177,7 @@ button { font-family: inherit; cursor: pointer; }
 .tab .close { width: 16px; height: 16px; border-radius: 4px; display: grid; place-items: center; color: var(--fg-faint); }
 .tab .close:hover { background: var(--bg-hover); color: var(--fg); }
 .tab .tic { color: var(--accent); }
+.tab.dragging { opacity: .55; box-shadow: var(--shadow); position: relative; z-index: 5; transform: scale(1.02); }
 
 .breadcrumb { display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 12px; color: var(--fg-muted); background: var(--bg-workspace); border-bottom: 1px solid var(--border); }
 .breadcrumb b { color: var(--fg); font-weight: 500; }
@@ -234,7 +251,7 @@ input[type="range"] { width: 90px; accent-color: var(--accent); }
 .scrubber .labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--fg-faint); }
 
 /* ===== explorer ===== */
-.explorer { grid-area: explorer; width: 264px; display: flex; flex-direction: column; border-left: 1px solid var(--border); }
+.explorer { grid-area: explorer; min-width: 220px; max-width: 420px; display: flex; flex-direction: column; border-left: 1px solid var(--border); }
 .exp-head { padding: 10px 12px; font-weight: 600; font-size: 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
 .exp-head .add { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; color: var(--fg-faint); border: none; background: transparent; }
 .exp-head .add:hover { color: var(--accent); background: var(--accent-soft); }
@@ -362,7 +379,7 @@ input[type="range"] { width: 90px; accent-color: var(--accent); }
   <!-- ======= Work Area ======= -->
   <main class="work">
     <div class="tabbar" id="tabbar">
-      <div class="tab active" data-tab="ch12"><span class="tic">📄</span>第 12 章 · 叛门 <span class="close" onclick="closeTab(this)">✕</span></div>
+      <div class="tab active" data-tab="ch12" data-pane="pane-editor" onclick="onTabClick(event,this)"><span class="tic">📄</span>第 12 章 · 叛门 <span class="close" onclick="closeTab(this)">✕</span></div>
     </div>
 
     <div class="breadcrumb">
@@ -469,6 +486,8 @@ input[type="range"] { width: 90px; accent-color: var(--accent); }
     <span class="seg">sort_order 12</span>
     <span class="seg" style="color:var(--accent)">✦ AI 就绪</span>
   </footer>
+<div class="resizer r-ai" id="r-ai" title="拖动调整 AI 栏宽度"></div>
+<div class="resizer r-exp" id="r-exp" title="拖动调整内容树宽度"></div>
 </div>
 
 <!-- ======= Drawer ======= -->
@@ -521,26 +540,113 @@ function switchTab(paneId){
   });
   const el = document.getElementById(paneId);
   el.classList.remove('hidden'); el.classList.add('fade');
+  // highlight tabbar + explorer
+  document.querySelectorAll('#tabbar .tab').forEach(t=>t.classList.toggle('active', t.dataset.pane===paneId));
   // highlight explorer
   document.querySelectorAll('.exp-item').forEach(x=>x.classList.toggle('active', x.textContent.includes(mapping[paneId]||'')));
 }
 const mapping = { 'pane-editor':'第', 'pane-outline':'大纲', 'pane-graph':'人物关系图' };
 
-function addTab(label){
+function onTabClick(e, tab){
+  if(e.target.closest('.close')) return; // 点关闭按钮不触发切换
+  if(window.__suppressTabClick){ window.__suppressTabClick=false; return; } // 拖拽后的 click 不触发切换
+  switchTab(tab.dataset.pane);
+}
+const TAB_DEFS = {
+  ch11:{label:'第 11 章 · 风起', pane:'pane-editor'},
+  ch12:{label:'第 12 章 · 叛门', pane:'pane-editor'},
+  ch13:{label:'第 13 章 · 反目', pane:'pane-editor'},
+  graph:{label:'关系图', pane:'pane-graph'},
+  outline:{label:'大纲', pane:'pane-outline'}
+};
+function addTab(key, label, pane){
   const tb = document.getElementById('tabbar');
   const d = document.createElement('div');
   d.className='tab active';
-  d.dataset.tab=label;
+  d.dataset.tab=key; d.dataset.pane=pane;
   d.innerHTML = `<span class="tic">📄</span>${label} <span class="close" onclick="closeTab(this)">✕</span>`;
+  d.onclick = (e)=>onTabClick(e, d);
   document.querySelectorAll('#tabbar .tab').forEach(t=>t.classList.remove('active'));
   tb.appendChild(d);
 }
-function closeTab(elm){ elm.closest('.tab').remove(); }
-function openTab(type){
-  if(type==='graph'){ addTab('关系图'); switchTab('pane-graph'); }
-  else if(type==='outline'){ addTab('大纲'); switchTab('pane-outline'); }
-  else { addTab(type==='ch12'?'第 12 章 · 叛门':type==='ch11'?'第 11 章 · 风起':'第 13 章 · 反目'); switchTab('pane-editor'); }
+function closeTab(elm){
+  const tab = elm.closest('.tab');
+  const wasActive = tab.classList.contains('active');
+  tab.remove();
+  if(wasActive){
+    const rest = document.querySelectorAll('#tabbar .tab');
+    if(rest.length) switchTab(rest[rest.length-1].dataset.pane);
+    else openTab('ch12'); // 全部关闭时回到默认章，保证工作区不为空
+  }
 }
+function openTab(type){
+  const def = TAB_DEFS[type] || {label:type, pane:'pane-editor'};
+  const existing = document.querySelector(`#tabbar .tab[data-tab="${type}"]`);
+  if(existing){ switchTab(def.pane); return; } // 已打开 → 只聚焦切换，不重复开
+  addTab(type, def.label, def.pane);
+  switchTab(def.pane);
+}
+
+/* ====== tab drag to reorder ====== */
+(function initTabDrag(){
+  const bar = document.getElementById('tabbar');
+  if(!bar) return;
+  let dragEl=null, startX=0, startY=0, moved=false;
+
+  bar.addEventListener('pointerdown', e=>{
+    const tab = e.target.closest('.tab');
+    if(!tab || e.target.closest('.close')) return;
+    dragEl = tab; startX=e.clientX; startY=e.clientY; moved=false;
+    if(bar.setPointerCapture) bar.setPointerCapture(e.pointerId);
+  });
+  bar.addEventListener('pointermove', e=>{
+    if(!dragEl) return;
+    if(!moved && Math.hypot(e.clientX-startX, e.clientY-startY) > 5) moved=true;
+    if(moved){
+      const cur = dragEl;
+      cur.classList.add('dragging');
+      const tabs = [...bar.querySelectorAll('.tab:not(.dragging)')];
+      let before=null;
+      for(const t of tabs){
+        if(e.clientX < t.getBoundingClientRect().left + t.offsetWidth/2){ before=t; break; }
+      }
+      if(before && before!==cur){ bar.insertBefore(cur, before); }
+      else if(!before) bar.appendChild(cur);
+    }
+  });
+  function end(){
+    if(dragEl) dragEl.classList.remove('dragging');
+    if(moved) window.__suppressTabClick=true; // 拖拽后的 click 不再触发切换
+    dragEl=null; moved=false;
+  }
+  bar.addEventListener('pointerup', end);
+  bar.addEventListener('pointercancel', ()=>{ if(dragEl) dragEl.classList.remove('dragging'); dragEl=null; moved=false; });
+})();
+
+/* ====== column resizers ====== */
+function makeResizer(handle, prop, sign, min, max){
+  if(!handle) return;
+  let startX=0, startVal=0;
+  handle.addEventListener('pointerdown', e=>{
+    e.preventDefault();
+    startX=e.clientX;
+    startVal=(parseInt(getComputedStyle(document.body).getPropertyValue(prop))||0);
+    if(handle.setPointerCapture) handle.setPointerCapture(e.pointerId);
+    handle.classList.add('dragging');
+    document.body.classList.add('col-resizing');
+  });
+  handle.addEventListener('pointermove', e=>{
+    if(!handle.classList.contains('dragging')) return;
+    let v = Math.round(startVal + sign*(e.clientX-startX));
+    v = Math.max(min, Math.min(max, v));
+    document.body.style.setProperty(prop, v+'px');
+  });
+  const stop = ()=>{ handle.classList.remove('dragging'); document.body.classList.remove('col-resizing'); };
+  handle.addEventListener('pointerup', stop);
+  handle.addEventListener('pointercancel', stop);
+}
+makeResizer(document.getElementById('r-ai'),  '--ai-w',  1, 200, 460);
+makeResizer(document.getElementById('r-exp'), '--exp-w', -1, 220, 520);
 
 /* graph toolbar */
 function toggleMode(btn){
