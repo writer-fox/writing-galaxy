@@ -2,9 +2,9 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ForceGraph3D from '3d-force-graph'
 import {
-  AdditiveBlending, AmbientLight, BackSide, BoxGeometry, BufferAttribute,
+  AdditiveBlending, AmbientLight, BoxGeometry, BufferAttribute,
   BufferGeometry, CanvasTexture, Color, ConeGeometry, DirectionalLight, EdgesGeometry,
-  Group, Line, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial,
+  Group, Line, LineBasicMaterial, LineSegments, Mesh,
   MeshStandardMaterial, Points, PointsMaterial, QuadraticBezierCurve3, Scene,
   SphereGeometry, Sprite, SpriteMaterial, Vector2, Vector3,
 } from 'three'
