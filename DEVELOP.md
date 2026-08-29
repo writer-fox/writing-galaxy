@@ -89,16 +89,18 @@ npm run build      # 生产构建(vue-tsc 类型检查 + vite build,必须全绿
 | GET | `/api/works/{id}/tree` | ✅ 章节树 |
 | GET/POST/PUT/DELETE | `/api/chapters[/{id}]` | ✅ 含 sort_order 重排 |
 | GET | `/api/works/{id}/graph?mode=&sort=` | ✅ god/timeline |
-| GET/POST | `/api/works/{id}/characters` | 🚧 迭代 |
-| PUT/DELETE | `/api/characters/{id}` | 🚧 迭代 |
-| GET/POST | `/api/works/{id}/factions` | 🚧 迭代 |
-| PUT/DELETE | `/api/factions/{id}` | 🚧 迭代 |
-| GET/POST | `/api/works/{id}/relationships` | 🚧 迭代 |
-| PUT | `/api/relationships/{id}/confirm` | 🚧 迭代 |
-| GET/POST | `/api/works/{id}/outline` | 🚧 迭代 |
-| PUT/DELETE | `/api/outline/{id}` | 🚧 迭代 |
-| POST | `/api/ai/outline` | 🚧 迭代(provider 骨架) |
-| POST | `/api/ai/analyze-chapter` | 🚧 迭代(provider 骨架) |
+| GET/POST | `/api/works/{id}/characters` | ✅ 人物列表/新建 |
+| PUT/DELETE | `/api/characters/{id}` | ✅ 人物修正/删除(级联清关系) |
+| GET/POST | `/api/works/{id}/factions` | ✅ 势力列表/新建 |
+| PUT/DELETE | `/api/factions/{id}` | ✅ 势力修正/删除(解除归属) |
+| GET/POST | `/api/works/{id}/relationships` | ✅ 关系列表/新建 |
+| PUT | `/api/relationships/{id}/confirm` | ✅ 关系人工确认 |
+| DELETE | `/api/relationships/{id}` | ✅ 关系删除 |
+| GET/POST | `/api/works/{id}/outline` | ✅ 大纲树/新建 |
+| PUT/DELETE | `/api/outline/{id}` | ✅ 大纲修正/删除(级联子节点) |
+| POST | `/api/ai/outline` | ✅ 生成大纲(provider 有效时) |
+| POST | `/api/ai/analyze-chapter` | ✅ 单章关系抽取(provider 有效时) |
+| GET | `/api/ai/status` | ✅ 配置状态(LLM 是否已配 key) |
 
 > 响应格式与图数据 JSON 严格对齐 `技术方案.md` 第 4.3 节;关系 `rel_type` 枚举、颜色映射见方案 4.2.6。
 
@@ -112,27 +114,29 @@ npm run build      # 生产构建(vue-tsc 类型检查 + vite build,必须全绿
 6. **类型安全**:`npm run build`(vue-tsc)必须零错误——未使用的导入、隐式 any 都要清掉。
 7. **提交**:小而语义化 commit(feat:/fix:),改动后跑构建验证再提交。
 
-## 7. 当前迭代计划(并行分组)
+## 7. 当前迭代记录(上一轮已完成)
+
+> 上一轮按并行分组完成 M1(人物/势力/关系 CRUD)+ 大纲 + 设定集 + AI 接口骨架,并让前端全量对接后端。已提交 `6eed733` 并推送。
 
 ```
-组① 后端(互相零依赖,可并行)
-  A1 人物/势力/关系 CRUD      → 新文件 CastDao/CastController + 请求模型
-  A2 大纲 outline CRUD        → 新文件 OutlineDao/OutlineController + 请求模型
-  A3 AI provider + 接口骨架    → 新文件 llm/Provider 抽象 + AiController
+组① 后端(并行)  ✅
+  A1 人物/势力/关系 CRUD       CastDao/CastController + 请求模型
+  A2 大纲 outline CRUD         OutlineDao/OutlineController + 请求模型
+  A3 AI provider + 接口骨架     LlmProvider 抽象 + AiController(/api/ai/*)
 
-组② 前端(不依赖 A1-A3,立即开工)
-  B1 api.ts 补全全部接口       → 按方案契约先写死,与后端并行
-  B2 作品库面板(列表/新建/切换)+ 章节数据切后端 → 替换静态按钮/localStorage
+组② 前端(立即开工)  ✅
+  B1 api.ts 补全全部接口        按后端契约实现全部 REST 客户端
+  B2 作品库面板 + 章节切后端     works store;ActivityBar 作品库浮层;data store 走后端
 
-组③ 前端(依赖组①接口就绪)
-  B3 设定集面板:人物/势力/关系管理(增删改/确认),联动 3D 图
-  B4 大纲视图接后端 + AI 面板接后端
+组③ 前端(依赖组①)  ✅
+  B3 设定集面板                 cast store + SettingPane(人物/势力/关系增删改/确认,联动 3D)
+  B4 大纲 + AI 面板接后端        aichat store;OutlinePane 大纲树;AiPanel 接入 /api/ai
 
-组④ 联调
-  C1 全链路冒烟 → C2 mvn package + npm run build 全绿 → C3 提交推送
+组④ 联调  ✅
+  C1 全链路冒烟(graph-smoke 断言 PASSED + 建势力/人物/关系→图即时反映→确认→级联删除)
+  C2 mvn package 成功 + npm build 成功 + vue-tsc 零错误
+  C3 提交并推送 origin/master
 ```
-
-**串行瓶颈**:B3/B4 等 A1/A2/A3;C1 等全部。组①②可完全错开等待。
 
 ## 8. 验收标准(联调冒烟清单)
 
