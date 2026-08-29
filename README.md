@@ -1,9 +1,167 @@
-# ✨ 写作星河 · Writing Galaxy
+# ✨ Writing Galaxy · 写作星河
 
-> 面向网文作者的本地桌面写作软件：章节编辑 + 一键大纲 + 3D 人物/势力关系图。
-> 像 VSCode / Trae 一样运行的**原生桌面应用**（Electron），数据全部保存在本地，无需联网、无需安装服务器。
+> A local desktop writing app for web-novel authors: chapter editing, one-click outline generation, and a 3D character/faction relationship map.
+> Runs as a **native desktop app** (Electron) just like VSCode / Trae — all data stored locally, no network or server required.
 
 ---
+
+## Project Overview
+
+**Writing Galaxy** is a desktop writing tool built for web-novel (网文) authors, focused on the most painful parts of long-form writing:
+
+- 📝 **Smooth Writing**: CodeMirror editor + IDE-style multi-tabs — writing chapters feels like writing code. Dual themes (light smart-green / dark starry-night).
+- 🧭 **One-click Outline**: Based on written chapters, an LLM auto-organizes a 3-layer outline: 总纲 (volume index) → 分卷纲 (book outline) → 章纲 (chapter outline).
+- 🕸️ **3D Relationship Graph**: Characters and factions rendered as a star-web — node size = importance, node color = faction, edges = relationships (belong_to / enemy / kinship / master-disciple / lover…). Two view modes: **God view** (global) and **Timeline view** (fades in/out as chapters progress).
+- 👥 **Settings / Cast Panel**: Visual management of characters, factions and relationships — changes immediately reflect in the 3D graph.
+- 🤖 **AI Assistant**: One-click outline, per-chapter relationship extraction, Q&A and continuation (GLM-4 / DeepSeek switchable).
+
+**Desktop-grade experience**: native frameless window + custom title bar, four resizable columns (Works | AI Assist | Editor | Content Tree) — lightweight and modern like Trae / VSCode.
+
+**Local-first & private**: all data (works, chapters, characters, factions, relationships, outlines) is stored in a local SQLite database. No external server, works offline.
+
+---
+
+## ✨ Key Features
+
+| Module | Description |
+| --- | --- |
+| Writing Editor | Chapter editing with IDE-style tabs, CodeMirror 6 |
+| One-click Outline | LLM generates structured outline (volume/book/chapter), incremental updates |
+| 3D Relationship Graph | Nodes = characters/factions, edges = relationships; size = importance; `3d-force-graph` starry rendering |
+| Dual Views | God view (global) + Timeline view (fades as chapters progress) |
+| Cast Panel | CRUD + manual confirmation for characters/factions/relationships, syncs 3D graph |
+| AI Panel | One-click outline / analyze chapter / Q&A / continuation; GLM-4 & DeepSeek |
+| Dual Themes | Light (TRAE green) / Dark (starry teal), toggled & remembered |
+| Local Data | better-sqlite3 in user data dir, no server required |
+
+---
+
+## 🚀 Quick Start (Developers)
+
+### Requirements
+- Node.js 20+
+- npm 10+
+
+### Install & Run
+
+```bash
+cd ui/writer-app
+npm install
+
+# Development mode (hot reload + auto-open desktop window)
+npm run electron:dev
+
+# Production build + package (Windows installer)
+npm run dist:win
+```
+
+Outputs:
+- Installer: `ui/writer-app/release/写作星河-0.1.0-x64.exe`
+- Portable (no install): `ui/writer-app/release/win-unpacked/写作星河.exe`
+
+### Using the prebuilt installer
+
+Double-click `写作星河-0.1.0-x64.exe`, follow the wizard, then launch "写作星河" from your desktop. (No Node install, no network, no server needed.)
+
+---
+
+## 🤖 AI Configuration (Optional)
+
+The app works fully without AI (everything except AI features). To enable AI, set environment variables before launch:
+
+```bash
+# Windows (cmd)
+set LLM_API_KEY=your_key_here
+# macOS / Linux
+LLM_API_KEY=your_key_here npm run electron:start
+
+# Optional: switch model & gateway (default DeepSeek)
+set LLM_BASE_URL=https://api.deepseek.com/v1
+set LLM_MODEL=deepseek-chat
+```
+
+When unconfigured, clicking "Generate Outline / Analyze Chapter" returns a friendly hint — no errors, no crash.
+
+---
+
+## 📁 Data Location
+
+The database is auto-created on first launch in your user data directory:
+
+- **Windows**: `C:\Users\<you>\AppData\Roaming\writing-galaxy\data\writing-galaxy.db`
+- **macOS**: `~/Library/Application Support/writing-galaxy/data/writing-galaxy.db`
+- **Linux**: `~/.config/writing-galaxy/data/writing-galaxy.db`
+
+---
+
+## 📐 Tech Architecture
+
+```
+┌─────────────────────────── Renderer Process (Vue 3) ────────────────────┐
+│  ui/writer-app/src/                                                     │
+│    api.ts           Data gateway: IPC-first (REST fallback in browser)  │
+│    stores/          Pinia: works/data/cast/graph/tabs/theme/aichat      │
+│    components/      Four-column layout + panes(editor/outline/graph/cast) │
+│    TitleBar         Frameless-window custom title bar                   │
+└──────────────────────────────┬──────────────────────────────────────────┘
+                               │  window.wxAPI (contextBridge / IPC)
+┌──────────────────────────────▼────────────── Electron main process ─────┐
+│  electron/                                                              │
+│    main.js         Window creation + IPC registration + render diag     │
+│    preload.js      contextBridge secure bridge (exposes window.wxAPI)   │
+│    db.js           better-sqlite3 schema + demo data                    │
+│    store.js        Data layer: CRUD / sort_order reorder / graph / AI   │
+└─────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                 writing-galaxy.db (local SQLite, user data dir)
+```
+
+**Key design**
+- No separate backend process: single-process desktop app, all data in local SQLite.
+- `sort_order` is the single stable coordinate: chapters are densely re-sorted to 1,2,3… in a transaction after insert/delete (per TECHNICAL.md §4.2).
+- Native frameless window + dual themes (`data-theme` defined in `tokens.css`).
+
+---
+
+## 📄 Documentation
+
+| Doc | Description |
+| --- | --- |
+| `README.md` | This file: project overview + usage |
+| `DEVELOP.md` | Developer guide: architecture, build, conventions, known pitfalls |
+| `TECHNICAL.md` | Product & data model (sort_order, rel_type, etc.) |
+| `ui/UI-DESIGN.md` | Design spec: tokens / layout / interaction |
+
+---
+
+## 🧭 Roadmap
+
+- [x] Chapter editor + multi-tabs + dual themes
+- [x] Works library / chapter management (sort_order coordinates)
+- [x] Cast panel: characters / factions / relationships
+- [x] 3D relationship graph (god view + timeline)
+- [x] Outline view + AI generation / per-chapter analysis (provider abstraction)
+- [x] Electron desktop packaging + Windows installer
+- [ ] App icon & branding
+- [ ] In-app AI key settings panel
+- [ ] macOS / Linux packaging & release
+- [ ] Auto-update (electron-updater)
+
+---
+
+## 📬 Contact / Contributing
+
+Single-author writing tool; issues & suggestions are welcome. Core development follows the conventions in `DEVELOP.md`.
+
+---
+
+---
+
+# 写作星河 · 项目简介（中文）
+
+> 面向网文作者的本地桌面写作软件：章节编辑 + 一键大纲 + 3D 人物/势力关系图。
+> 像 VSCode / Trae 一样运行的原生桌面应用（Electron），数据全部保存在本地，无需联网、无需服务器。
 
 ## 项目简介
 
@@ -19,9 +177,7 @@
 
 **本地优先 & 隐私**：所有数据（作品、章节、人物、势力、关系、大纲）都保存在本地 SQLite 数据库，不依赖任何外部服务器，离线也能用。
 
----
-
-## ✨ 功能亮点
+## 功能亮点
 
 | 模块 | 说明 |
 | --- | --- |
@@ -34,126 +190,39 @@
 | 双主题 | 浅色（TRAE 智能绿）／深色（星夜青绿），一键切换并持久记忆 |
 | 本地数据 | better-sqlite3，存在用户数据目录，无需服务器 |
 
----
-
-## 🚀 快速开始（开发者）
-
-### 环境要求
+## 环境要求
 - Node.js 20+
 - npm 10+
 
-### 安装与运行
+## 安装与运行
 
 ```bash
 cd ui/writer-app
 npm install
-
-# 开发模式（热更新 + 自动弹出桌面窗口）
-npm run electron:dev
-
-# 生产构建 + 打包安装包（Windows）
-npm run dist:win
+npm run electron:dev     # 开发模式（热更新 + 弹出桌面窗口）
+npm run dist:win         # 生产构建 + 打包安装包
 ```
 
 打包产物：
 - 安装包：`ui/writer-app/release/写作星河-0.1.0-x64.exe`
 - 免安装版：`ui/writer-app/release/win-unpacked/写作星河.exe`
 
-### 使用已打好的安装包
-
-直接双击 `写作星河-0.1.0-x64.exe`，按向导安装，即可在桌面启动「写作星河」。（无需安装 Node、无需联网。）
-
----
-
-## 🤖 AI 配置（可选）
-
-应用默认不调用大模型也能正常使用（除 AI 功能外全部可用）。若想启用 AI，需在启动前配置环境变量：
+## AI 配置（可选）
 
 ```bash
-# Windows (cmd)
-set LLM_API_KEY=your_key_here
-# macOS / Linux
-LLM_API_KEY=your_key_here npm run electron:start
-
-# 可选：切换模型与网关（默认 DeepSeek）
-set LLM_BASE_URL=https://api.deepseek.com/v1
-set LLM_MODEL=deepseek-chat
+set LLM_API_KEY=your_key_here   # Windows
+LLM_API_KEY=your_key_here npm run electron:start   # macOS/Linux
 ```
 
 未配置时，点「生成大纲 / 分析本章」会返回友好提示，不会报错或崩溃。
 
----
-
-## 📁 数据存放位置
-
-首次启动会自动建库，数据存在系统的用户数据目录：
-
-- **Windows**：`C:\Users\<你>\AppData\Roaming\writing-galaxy\data\writing-galaxy.db`
-- **macOS**：`~/Library/Application Support/writing-galaxy/data/writing-galaxy.db`
-- **Linux**：`~/.config/writing-galaxy/data/writing-galaxy.db`
-
----
-
-## 📐 技术架构
-
-```
-┌─────────────────────────── 渲染进程 (Vue 3) ───────────────────────────┐
-│  ui/writer-app/src/                                                    │
-│    api.ts           数据出口：IPC 优先（浏览器预览时回退 REST）          │
-│    stores/          Pinia：works/data/cast/graph/tabs/theme/aichat     │
-│    components/      四栏布局 + panes(编辑器/大纲/关系图/设定集)           │
-│    TitleBar       无边框窗口自定义标题栏                                 │
-└──────────────────────────────┬─────────────────────────────────────────┘
-                               │  window.wxAPI（contextBridge / IPC）
-┌──────────────────────────────▼────────────── Electron 主进程 ──────────┐
-│  electron/                                                             │
-│    main.js        窗口创建 + IPC 注册 + 渲染诊断                         │
-│    preload.js     contextBridge 安全桥（暴露 window.wxAPI）              │
-│    db.js          better-sqlite3 建库建表 + 演示数据                     │
-│    store.js       数据操作层：CRUD / sort_order 重排 / graph 组装 / AI   │
-└────────────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-                 writing-galaxy.db（本地 SQLite，用户数据目录）
-```
-
-**关键设计**
-- 无独立后端进程：单进程桌面应用，数据全存本地 SQLite。
-- `sort_order` 是唯一稳定坐标：章节插入/删除后事务内全量紧凑重排为 1,2,3…（对齐技术方案 4.2）。
-- 原生无边框窗口 + 双主题（tokens.css 定义 `data-theme`）。
-
----
-
-## 📄 文档
+## 文档
 
 | 文档 | 说明 |
 | --- | --- |
 | `README.md` | 本文档：项目简介 + 使用说明 |
 | `DEVELOP.md` | 开发者指南：架构、构建、开发约定、常见坑 |
-| `技术方案.md` | 产品与数据模型权威说明（含 sort_order、rel_type 等） |
-| `ui/UI设计文档.md` | 设计规范：tokens / 布局 / 交互 |
-
----
-
-## 🧭 路线图
-
-- [x] 章节编辑器 + 多 Tab + 双主题
-- [x] 作品库 / 章节维护（sort_order 坐标）
-- [x] 人物/势力/关系设定集管理
-- [x] 3D 人物关系图（上帝视角 + 时间轴）
-- [x] 大纲视图 + AI 生成 / 单章分析（接口 + Provider 抽象）
-- [x] Electron 桌面化 + Windows 安装包
-- [ ] 应用图标与品牌
-- [ ] 内置 AI Key 设置面板
-- [ ] macOS / Linux 打包与发布
-- [ ] 自动更新（electron-updater）
-
----
-
-## 📬 联系 / 贡献
-
-本项目为单作者写作工具，欢迎提 issue 或建议。核心开发遵守 `DEVELOP.md` 中的约定。
-
----
+| `TECHNICAL.md` | 产品与数据模型权威说明（含 sort_order、rel_type 等） |
+| `ui/UI-DESIGN.md` | 设计规范：tokens / 布局 / 交互 |
 
 ⚛️ 用「写作星河」，让灵感成星河。

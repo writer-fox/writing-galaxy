@@ -18,8 +18,8 @@
 
 ```
 写作星河/
-├── 技术方案.md          # 产品/数据模型（权威）
-├── UI设计文档.md         # 设计规范（tokens/布局/交互）
+├── TECHNICAL.md          # 产品/数据模型（权威）
+├── UI-DESIGN.md         # 设计规范（tokens/布局/交互）
 ├── DEVELOP.md           # 本文档
 └── ui/
     └── writer-app/      # Electron + Vue 前端工程（唯一工程）
@@ -98,7 +98,7 @@ LLM_API_KEY=xxx            # macOS/Linux
 - **relationship** 关系（from/to 类型、rel_type、start/end 坐标）
 - **outline_node** 大纲三层树（level 0/1/2）
 
-关系 `rel_type` 枚举与颜色映射见 `store.js` 的 `REL_META`，与 `技术方案.md` 4.2.6 一致。
+关系 `rel_type` 枚举与颜色映射见 `store.js` 的 `REL_META`，与 `TECHNICAL.md` 4.2.6 一致。
 
 ## 6. 开发约定
 
