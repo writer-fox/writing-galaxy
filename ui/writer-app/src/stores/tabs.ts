@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-export type TabType = 'chapter' | 'outline' | 'graph'
+export type TabType = 'chapter' | 'outline' | 'graph' | 'setting'
 
 export interface Tab {
   key: string // 唯一键；chapter 用 ch12，outline/graph 用固定键
@@ -14,12 +14,14 @@ export const PANE_ID: Record<TabType, string> = {
   chapter: 'pane-editor',
   outline: 'pane-outline',
   graph: 'pane-graph',
+  setting: 'pane-setting',
 }
 
 const PANE_LABEL: Record<TabType, string> = {
   chapter: '章节',
   outline: '大纲',
   graph: '关系图',
+  setting: '设定集',
 }
 
 export const useTabsStore = defineStore('tabs', () => {
@@ -51,6 +53,10 @@ export const useTabsStore = defineStore('tabs', () => {
 
   function openGraph() {
     open({ key: 'graph', type: 'graph', label: PANE_LABEL.graph })
+  }
+
+  function openSetting() {
+    open({ key: 'setting', type: 'setting', label: PANE_LABEL.setting })
   }
 
   function activate(key: string) {
@@ -86,6 +92,7 @@ export const useTabsStore = defineStore('tabs', () => {
     openChapter,
     openOutline,
     openGraph,
+    openSetting,
     activate,
     close,
     reorder,

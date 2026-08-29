@@ -23,18 +23,18 @@ function isCollapsed(id: string) {
   return collapsed.value.has(id)
 }
 
-function addAfter(c: Chapter) {
-  const ch = data.addChapter(c.sortOrder)
+async function addAfter(c: Chapter) {
+  const ch = await data.addChapter(c.sortOrder)
   tabs.openChapter(ch.id, chapterLabel(ch))
 }
-function addEnd() {
-  const ch = data.addChapter()
+async function addEnd() {
+  const ch = await data.addChapter()
   tabs.openChapter(ch.id, chapterLabel(ch))
 }
 
-function del(c: Chapter) {
+async function del(c: Chapter) {
   tabs.close(c.id)
-  data.removeChapter(c.id)
+  await data.removeChapter(c.id)
 }
 
 function startEdit(c: Chapter) {
@@ -50,8 +50,11 @@ function cancelEdit() {
   editingId.value = ''
 }
 
-function compact() {
-  data.renumber()
+async function compact() {
+  tabs.close('')
+  await data.renumber()
+  const first = data.sortedChapters[0]
+  if (first) tabs.openChapter(first.id, chapterLabel(first))
 }
 </script>
 
@@ -107,14 +110,9 @@ function compact() {
       <div class="exp-cat" @click="tabs.openGraph()">
         <span class="chev down">▸</span>人物关系图 <button class="jump">✧</button>
       </div>
-      <div class="exp-cat" @click="toggleCat('settings')">
-        <span class="chev" :class="{ down: !isCollapsed('settings') }">▸</span>设定集
+      <div class="exp-cat" @click="tabs.openSetting()">
+        <span class="chev down">▸</span>设定集 <span class="cnt">· 人物/势力/关系</span>
       </div>
-      <template v-if="!isCollapsed('settings')">
-        <div v-for="n in data.notes" :key="n.id" class="exp-item warn">
-          <span class="st st-todo"></span><span class="txt">{{ n.title }}</span>
-        </div>
-      </template>
     </div>
   </aside>
 </template>

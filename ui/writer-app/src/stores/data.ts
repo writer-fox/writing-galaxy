@@ -1,14 +1,17 @@
 import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
+import { api, type ChapterBackend } from '../api'
 import { loadFromStorage, saveToStorage } from './persistence'
 
 /* ---------- 类型（对齐技术方案 4.2） ---------- */
 export type ChapterStatus = '草稿' | '完成' | '已分析'
 
 export interface Chapter {
-  id: string // 稳定唯一 id，供 tab / 引用（不随排序漂移）
-  sortOrder: number // 唯一排序坐标，作为时间轴基准；重排时紧凑化（1,2,3…）
-  title: string // 章节名（不含"第 N 章"前缀，前缀由 sortOrder 展示层拼出）
+  id: string // 展示用 key（back: c{id}）；真实 id 在 rawId
+  rawId?: number // 后端章节 id
+  workId?: number
+  sortOrder: number // 后端 sort_order
+  title: string
   content: string
   status: ChapterStatus
 }
@@ -18,7 +21,7 @@ export interface OutlineItem {
   level: 0 | 1 | 2
   title: string
   desc?: string
-  refSortOrder?: number // 章纲关联章节坐标
+  refSortOrder?: number
   pending?: boolean
 }
 
@@ -28,53 +31,49 @@ export interface Note {
   title: string
 }
 
-/* ---------- 初始示例数据 ---------- */
-function seedChapters(): Chapter[] {
-  return [
-    { id: 'c1', sortOrder: 1, title: '风起', status: '完成', content: '风从未知的北方来，带着铁器与尘土的气息。\n\n客栈楼板的旧酒味里，应无涯压低声音："元门的人已经过了青岭。你还有一夜。"\n\n林动没有答话，只是把桌上的油灯压得更低了些。趁夜，是他早就盘算好的退路。' },
-    { id: 'c2', sortOrder: 2, title: '叛门', status: '完成', content: '夜色像一匹浸了墨的绢帛，低低地压在元门的青石阶上。\n\n林动手心的传讯玉简微微发烫，那上头只有一行字——「速走，勿回头」。\n\n他不知道这是谁递出来的消息。这五年来，他把自己活成一柄待鞘的刀，沉在元门最不起眼的杂役房。可他终究还是被看到了。当四长老的指印落在他肩头，他忽然明白，有些人注定藏不住。' },
-    { id: 'c3', sortOrder: 3, title: '反目', status: '草稿', content: '' },
-  ]
-}
-
-function seedOutline(): OutlineItem[] {
-  return [
-    { id: 'o1', level: 0, title: '少年磨砺 · 逆命崛起' },
-    { id: 'o2', level: 1, title: '第二卷 · 云起' },
-    { id: 'o3', level: 2, title: '叛门', refSortOrder: 2, desc: '冲突前置（揪心）· 教众质疑 → 长老出手 → 退门令 · 预告下卷暗线' },
-    { id: 'o4', level: 2, title: '反目', pending: true },
-  ]
-}
-
+/* ---------- 数据来源 ---------- */
 const SEED_NOTES: Note[] = [{ id: 'n1', type: '元门 · 待确认', title: '元门 · 待确认' }]
+
+/** 大纲初始值：优先取本地缓存，否则空（由后端在加载时填充）。 */
+function backendOutline(): OutlineItem[] {
+  return loadFromStorage<OutlineItem[]>('outline', [])
+}
 
 /** 展示标题：由 sortOrder 直接拼出「第 N 章 · 名」。 */
 export function chapterLabel(ch: Pick<Chapter, 'sortOrder' | 'title'>): string {
   return `第 ${ch.sortOrder} 章 · ${ch.title}`
 }
 
-export const useDataStore = defineStore('data', () => {
-  // 版本/结构校验：旧版对象（无 id 字段）视为需重置，避免脏数据
-  const initialChapters = (): Chapter[] => {
-    const cands = loadFromStorage<Chapter[]>('chapters', seedChapters())
-    const valid =
-      Array.isArray(cands) &&
-      cands.length > 0 &&
-      cands.every((c) => c && typeof c.id === 'string' && typeof c.sortOrder === 'number')
-    return valid ? cands : seedChapters()
-  }
-  const chapters = ref<Chapter[]>(initialChapters())
-  const outline = ref<OutlineItem[]>(loadFromStorage('outline', seedOutline()))
-  const notes = ref<Note[]>(loadFromStorage('notes', SEED_NOTES))
+const STATUS_KEYS: Record<number, ChapterStatus> = { 0: '草稿', 1: '完成', 2: '已分析' }
 
-  // 自动持久化
-  watch(
-    chapters,
-    (v) => saveToStorage('chapters', v),
-    { deep: true }
-  )
+export const useDataStore = defineStore('data', () => {
+  const chapters = ref<Chapter[]>([])
+  const outline = ref<OutlineItem[]>(backendOutline())
+  const notes = ref<Note[]>(loadFromStorage('notes', SEED_NOTES))
+  const loadingChapters = ref(false)
+  const lastWorkId = ref<number | null>(null)
+
+  // 章节持久化到后端（若尚未接后端则不持久化，避免误清）
+  watch(chapters, (v) => saveToStorage('chapters', v), { deep: true })
   watch(outline, (v) => saveToStorage('outline', v), { deep: true })
   watch(notes, (v) => saveToStorage('notes', v), { deep: true })
+
+  /** 从后端章节数组导入到本地状态（保持 1..N 排序与展示 key）。 */
+  function importFromBackend(list: ChapterBackend[]) {
+    chapters.value = list
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((c) => ({
+        id: 'c' + c.id,
+        rawId: c.id,
+        workId: c.workId,
+        sortOrder: c.sortOrder,
+        title: c.title,
+        content: c.content,
+        status: STATUS_KEYS[c.status] || '草稿',
+      }))
+    if (list.length) lastWorkId.value = list[0].workId
+  }
 
   /** 当前按 sortOrder 升序排序后的章节。 */
   const sortedChapters = computed(() =>
@@ -85,53 +84,66 @@ export const useDataStore = defineStore('data', () => {
     return chapters.value.find((c) => c.id === id)
   }
 
-  function nextId(): string {
-    const max = chapters.value.reduce((m, c) => Math.max(m, parseInt(c.id.slice(1), 10) || 0), 0)
-    return `c${max + 1}`
-  }
-
-  /** 立即把所有章节坐标紧凑化为 1,2,3…（按当前列表顺序）。 */
-  function renumber() {
-    const sorted = [...chapters.value].sort((a, b) => a.sortOrder - b.sortOrder)
-    sorted.forEach((c, i) => (c.sortOrder = i + 1))
-  }
-
-  /**
-   * 新建章节，插入到 sortOrder 为 afterSortOrder 的章节之后（省略则追加末尾）。
-   * 插入后对全部章节做一次紧凑重排，保证坐标唯一连续（1,2,3…）。
-   */
-  function addChapter(afterSortOrder?: number): Chapter {
-    const ch: Chapter = {
-      id: nextId(),
-      sortOrder: 0,
-      title: '新章节',
-      content: '',
-      status: '草稿',
+  /** 新建章节：插入到 sortOrder 为 afterSortOrder 之后；后端负责 compact 重排。 */
+  async function addChapter(afterSortOrder?: number): Promise<Chapter> {
+    const wid = lastWorkId.value
+    if (wid == null) {
+      const ch: Chapter = { id: 'tmp-' + Date.now(), sortOrder: chapters.value.length + 1, title: '新章节', content: '', status: '草稿' }
+      chapters.value = [...chapters.value, ch]
+      return ch
     }
-    const sorted = [...chapters.value].sort((a, b) => a.sortOrder - b.sortOrder)
-    let insIdx = sorted.length
-    if (afterSortOrder !== undefined) {
-      insIdx = sorted.findIndex((c) => c.sortOrder > afterSortOrder)
-      if (insIdx === -1) insIdx = sorted.length
+    try {
+      const created = await api.chapters.create(wid, '新章节', afterSortOrder)
+      await importFromBackend(await api.chapters.listByWork(wid))
+      const c = chapterById('c' + created.id)
+      return c || { id: 'c' + created.id, sortOrder: created.sortOrder, title: created.title, content: '', status: '草稿' }
+    } catch (e: any) {
+      console.error('addChapter 失败', e)
+      const ch: Chapter = { id: 'tmp-' + Date.now(), sortOrder: chapters.value.length + 1, title: '新章节', content: '', status: '草稿' }
+      chapters.value = [...chapters.value, ch]
+      return ch
     }
-    sorted.splice(insIdx, 0, ch)
-    sorted.forEach((c, i) => (c.sortOrder = i + 1))
-    chapters.value = sorted
-    return ch
   }
 
-  /** 删除章节并紧凑重排。返回是否删除成功。 */
-  function removeChapter(id: string): boolean {
-    const idx = chapters.value.findIndex((c) => c.id === id)
-    if (idx === -1) return false
-    chapters.value.splice(idx, 1)
-    renumber()
+  /** 删除章节（后端删除并重排）。返回是否成功。 */
+  async function removeChapter(id: string): Promise<boolean> {
+    const c = chapterById(id)
+    if (!c) return false
+    if (c.rawId != null && c.workId != null) {
+      try {
+        await api.chapters.remove(c.rawId, c.workId)
+        await importFromBackend(await api.chapters.listByWork(c.workId))
+        return true
+      } catch (e: any) {
+        console.error('removeChapter 失败', e)
+        return false
+      }
+    }
+    chapters.value = chapters.value.filter((x) => x.id !== id)
     return true
+  }
+
+  /** 把全部章节坐标压实为 1..N（后端已自动压实，这里同步本地展示）。 */
+  async function renumber() {
+    if (!chapters.value.length) return
+    const wid = chapters.value[0].workId
+    if (wid != null) {
+      try {
+        await importFromBackend(await api.chapters.listByWork(wid))
+      } catch (e) { console.error('renumber 失败', e) }
+    } else {
+      const sorted = [...chapters.value].sort((a, b) => a.sortOrder - b.sortOrder)
+      sorted.forEach((c, i) => (c.sortOrder = i + 1))
+    }
   }
 
   function setTitle(id: string, title: string) {
     const c = chapterById(id)
-    if (c) c.title = title || '未命名'
+    if (!c) return
+    c.title = title || '未命名'
+    if (c.rawId != null) {
+      api.chapters.update(c.rawId, { title: title || '未命名' }).catch((e) => console.error('存标题失败', e))
+    }
   }
 
   function setContent(id: string, content: string) {
@@ -139,6 +151,9 @@ export const useDataStore = defineStore('data', () => {
     if (!c) return
     c.content = content
     c.status = '草稿'
+    if (c.rawId != null) {
+      api.chapters.update(c.rawId, { content, status: 0 }).catch((e) => console.error('存正文失败', e))
+    }
   }
 
   return {
@@ -146,6 +161,9 @@ export const useDataStore = defineStore('data', () => {
     sortedChapters,
     outline,
     notes,
+    loadingChapters,
+    lastWorkId,
+    importFromBackend,
     chapterById,
     addChapter,
     removeChapter,

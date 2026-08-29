@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import ActivityBar from './components/ActivityBar.vue'
 import AiPanel from './components/AiPanel.vue'
 import WorkPane from './components/WorkPane.vue'
 import Explorer from './components/Explorer.vue'
 import StatusBar from './components/StatusBar.vue'
 import { useLayoutResize } from './composables/layout'
+import { useWorksStore } from './stores/works'
 
 useLayoutResize()
+const works = useWorksStore()
+onMounted(() => works.init())
 </script>
 
 <template>

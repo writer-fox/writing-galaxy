@@ -4,11 +4,14 @@ import TabBar from './TabBar.vue'
 import EditorPane from './panes/EditorPane.vue'
 import OutlinePane from './panes/OutlinePane.vue'
 import GraphPane from './panes/GraphPane.vue'
+import SettingPane from './panes/SettingPane.vue'
 import { useTabsStore } from '../stores/tabs'
 import { useDataStore } from '../stores/data'
+import { useWorksStore } from '../stores/works'
 
 const tabs = useTabsStore()
 const data = useDataStore()
+const works = useWorksStore()
 
 const activeType = computed(() => tabs.activeTab?.type || 'chapter')
 
@@ -28,7 +31,7 @@ const breadTitle = computed(() => {
     <TabBar />
 
     <div class="breadcrumb">
-      <span>大泽界</span><span class="sep">/</span><b>{{ breadTitle }}</b>
+      <span>{{ works.currentWork?.title || '写作星河' }}</span><span class="sep">/</span><b>{{ breadTitle }}</b>
       <div class="spacer"></div>
       <span class="stat" v-if="activeType === 'chapter' && chapter">
         <span class="save-dot"></span>已保存 {{ chapter.status }} · sort_order {{ chapter.sortOrder }}
@@ -41,6 +44,7 @@ const breadTitle = computed(() => {
       <EditorPane v-if="activeType === 'chapter'" class="pane" />
       <OutlinePane v-else-if="activeType === 'outline'" class="pane" />
       <GraphPane v-else-if="activeType === 'graph'" class="pane" />
+      <SettingPane v-else-if="activeType === 'setting'" class="pane" />
       <div v-else class="pane empty"><p class="ghost">从右侧内容树或 AI 栏打开内容。</p></div>
     </div>
   </main>
