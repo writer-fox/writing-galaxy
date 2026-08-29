@@ -1,0 +1,6 @@
+{
+  "name": "writing-galaxy-electron-main",
+  "private": true,
+  "type": "commonjs",
+  "main": "main.js"
+}
