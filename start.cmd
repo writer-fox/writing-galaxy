@@ -1,47 +1,46 @@
 @echo off
-chcp 65001 >nul
 rem ============================================================
-rem  写作星河 · 一键生产运行(后端 jar + 前端 dist 静态托管)
-rem  用法: 双击 start.cmd 即可; 首次会构建后端与前端
+rem  Writing Galaxy - one-click PROD launcher (backend 8080 + frontend preview 4173)
+rem  Usage: double-click start.cmd ; first run builds backend & frontend
 rem ============================================================
 setlocal
 cd /d "%~dp0"
 
 set JAR=backend\target\writer-backend.jar
 
-echo === 写作星河 一键启动 ===
+echo === Writing Galaxy - One-click Startup ===
 
-rem ---- 1. 后端 jar ----
+rem ---- 1. backend jar ----
 if not exist "%JAR%" (
-  echo [1/3] 后端 jar 不存在, 编译中...
+  echo [1/3] backend jar missing, building...
   call backend\mvnw.cmd -q -DskipTests package
-  if errorlevel 1 ( echo 后端编译失败 & pause & exit /b 1 )
+  if errorlevel 1 ( echo BACKEND BUILD FAILED & pause & exit /b 1 )
 ) else (
-  echo [1/3] 后端 jar 已就绪
+  echo [1/3] backend jar ready
 )
 
-rem ---- 2. 前端 dist ----
+rem ---- 2. frontend dist ----
 if not exist "ui\writer-app\dist\index.html" (
-  echo [2/3] 前端产物缺失, 构建中...
+  echo [2/3] frontend build missing, building...
   pushd ui\writer-app
   call npm install 2>nul
   call npm run build
   set BCK=%errorlevel%
   popd
-  if not "%BCK%"=="0" ( echo 前端构建失败 & pause & exit /b 1 )
+  if not "%BCK%"=="0" ( echo FRONTEND BUILD FAILED & pause & exit /b 1 )
 ) else (
-  echo [2/3] 前端 dist 已就绪
+  echo [2/3] frontend dist ready
 )
 
-rem ---- 3. 启动 ----
-echo [3/3] 启动后端与前端...
-start "写作星河-后端" cmd /k "cd /d %~dp0backend && java -jar target\writer-backend.jar"
+rem ---- 3. start ----
+echo [3/3] starting backend and frontend...
+start "wx-backend" cmd /k "cd /d %~dp0backend && java -jar target\writer-backend.jar"
 pushd ui\writer-app
-start "写作星河-前端" cmd /k "npm run preview -- --port 4173 --open"
+start "wx-frontend" cmd /k "npm run preview -- --port 4173 --open"
 popd
 
 echo.
-echo 后端监听 8080, 前端预览端口 4173(已尝试打开浏览器)
-echo 日常开发请用 dev.cmd (5173 自动刷新)。
-echo 停止: 关闭弹出的两个命令行窗口。
+echo Backend on 8080, frontend preview on 4173 (browser should open).
+echo For day-to-day dev use dev.cmd (5173, hot reload).
+echo To stop: close the two console windows.
 pause
