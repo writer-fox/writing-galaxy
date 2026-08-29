@@ -26,6 +26,9 @@ function createWindow() {
     minWidth: 960,
     minHeight: 640,
     title: '写作星河',
+    // 无边框窗口：隐藏系统标题栏，前端自绘标题栏（拖拽区 + 最小化/最大化/关闭按钮）
+    frame: false,
+    titleBarStyle: 'hidden',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -121,6 +124,17 @@ function registerIpc(database) {
       }
     })
   })
+
+  // 窗口控制（无边框标题栏）
+  ipcMain.handle('window:minimize', () => { mainWin?.minimize(); return { ok: true } })
+  ipcMain.handle('window:maximize-toggle', () => {
+    if (!mainWin) return { ok: true }
+    if (mainWin.isMaximized()) mainWin.unmaximize(); else mainWin.maximize()
+    return { ok: true, data: mainWin.isMaximized() }
+  })
+  ipcMain.handle('window:close', async () => { mainWin?.close(); return { ok: true } })
+  ipcMain.handle('window:is-maximized', () =>
+    ({ ok: true, data: mainWin ? mainWin.isMaximized() : false }))
 }
 
 app.whenReady().then(() => {

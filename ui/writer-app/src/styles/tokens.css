@@ -1,40 +1,56 @@
 /* ============================
    写作星河 · Design Tokens
-   双主题（亮/暗）CSS Custom Properties
+   双主题（亮 TRAE 风 / 暗 星夜风）CSS Custom Properties
+   含：界面色 + 语义色 + 关系图色板 + TRAE 设计维度（圆角/阴影/玻璃/强调）
    ============================ */
 
 :root,
 html[data-theme='light'] {
-  --bg-workspace: #f6f6f5;
+  /* ---- 基础色（组件兼容） ---- */
+  --bg-workspace: #f7f7fa;   /* TRAE 浅底 */
   --bg-panel: #ffffff;
-  --bg-sidebar: #f0f0ee;
+  --bg-sidebar: #f0f0f4;
   --bg-editor: #ffffff;
-  --bg-hover: #e9e9e6;
-  --bg-active: #fdfdfc;
-  --fg: #1f2328;
-  --fg-muted: #6b7280;
-  --fg-faint: #a8ada6;
-  --accent: #1f8f6e;
-  --accent-soft: #e3f3ee;
+  --bg-hover: #e9e9ee;
+  --bg-active: #f5f5f8;
+  --fg: #1d1d26;
+  --fg-muted: #868699;
+  --fg-faint: #b3b3c0;
+  --accent: #22c55e;         /* TRAE 智能绿 */
+  --accent-soft: #e2f7ea;
   --accent-fg: #ffffff;
-  --border: #e4e4e1;
-  --shadow: 0 8px 28px rgba(31, 35, 40, 0.12);
-  --scrollbar: #cfcfca;
-  --danger: #d64541;
+  --border: #e5e5ed;         /* 极细浅灰分割线 */
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  --scrollbar: #cfcfd8;
+  --danger: #ef4444;
   --warn: #d99a1e;
-  --ok: #1d9151;
-  --info: #3b82c4;
+  --ok: #22c55e;
+  --info: #5c9df0;
+
+  /* ---- TRAE 设计维度 ---- */
+  --window-radius: 12px;
+  --window-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+  --window-inner-gap: 8px;
+  --radius-lg: 8px;
+  --radius-md: 6px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.04);
+  --accent-2: #b4a0e8;       /* TRAE 次要淡紫 */
+  --titlebar-h: 40px;
+
+  /* ---- 关系图语义色板（rel_type 一一对应） ---- */
   --graph-grey: #8d9199;
-  --graph-green: #3dbd7d;
-  --graph-red: #e5484d;
+  --graph-green: #22c55e;
+  --graph-red: #ef4444;
   --graph-gold: #d9b64c;
-  --graph-blue: #4f9df0;
-  --graph-pink: #f07ab0;
-  --graph-orange: #f29d3f;
+  --graph-blue: #5c9df0;
+  --graph-pink: #e879a9;
+  --graph-orange: #f59e0b;
   --graph-purple: #a86ce0;
 }
 
 html[data-theme='dark'] {
+  /* ---- 基础色（保留星夜深色风） ---- */
   --bg-workspace: #171920;
   --bg-panel: #1d2028;
   --bg-sidebar: #13151b;
@@ -54,11 +70,24 @@ html[data-theme='dark'] {
   --warn: #e8b04b;
   --ok: #4dd187;
   --info: #5c9df0;
+
+  /* ---- TRAE 设计维度（深色版） ---- */
+  --window-radius: 12px;
+  --window-shadow: 0 14px 48px rgba(0, 0, 0, 0.55);
+  --window-inner-gap: 8px;
+  --radius-lg: 8px;
+  --radius-md: 6px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.3);
+  --accent-2: #b4a0e8;
+  --titlebar-h: 40px;
+
+  /* ---- 关系图语义色板 ---- */
   --graph-grey: #8d9199;
   --graph-green: #3dbd7d;
   --graph-red: #e5484d;
   --graph-gold: #d9b64c;
-  --graph-blue: #4f9df0;
+  --graph-blue: #5c9df0;
   --graph-pink: #f07ab0;
   --graph-orange: #f29d3f;
   --graph-purple: #a86ce0;

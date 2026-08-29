@@ -7,7 +7,7 @@ const STORAGE_KEY = 'wx-theme'
 
 function readInitial(): ThemeMode {
   const saved = localStorage.getItem(STORAGE_KEY)
-  return saved === 'light' ? 'light' : 'dark'
+  return saved === 'dark' ? 'dark' : 'light'
 }
 
 export const useThemeStore = defineStore('theme', () => {

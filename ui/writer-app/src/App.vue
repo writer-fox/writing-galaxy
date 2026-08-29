@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import TitleBar from './components/TitleBar.vue'
 import ActivityBar from './components/ActivityBar.vue'
 import AiPanel from './components/AiPanel.vue'
 import WorkPane from './components/WorkPane.vue'
@@ -14,28 +15,44 @@ onMounted(() => works.init())
 </script>
 
 <template>
-  <div class="shell">
-    <ActivityBar />
-    <AiPanel />
-    <WorkPane />
-    <Explorer />
-    <StatusBar />
+  <div class="electron-root">
+    <!-- 无边框窗口自定义标题栏 -->
+    <TitleBar />
+    <div class="shell">
+      <ActivityBar />
+      <AiPanel />
+      <WorkPane />
+      <Explorer />
+      <StatusBar />
 
-    <div class="resizer r-ai" id="r-ai" title="拖动调整 AI 栏宽度"></div>
-    <div class="resizer r-exp" id="r-exp" title="拖动调整内容树宽度"></div>
+      <div class="resizer r-ai" id="r-ai" title="拖动调整 AI 栏宽度"></div>
+      <div class="resizer r-exp" id="r-exp" title="拖动调整内容树宽度"></div>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* 无边框窗口外层圆角容器：内容与窗口边缘留间隙，呈现悬浮卡片质感 */
+.electron-root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--window-radius);
+  overflow: hidden;
+  background: var(--bg-workspace);
+  /* 窗口外部柔和投影(相对窗口层)；无边框 frame:false 时系统也提供阴影 */
+}
+
 .shell {
   position: relative;
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: var(--act-w) var(--ai-w) 1fr var(--exp-w);
   grid-template-rows: 1fr 24px;
   grid-template-areas:
     'activity ai work explorer'
     'status status status status';
-  height: 100vh;
 }
 
 .resizer {

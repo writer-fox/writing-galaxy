@@ -17,6 +17,7 @@ declare global {
       outline: { list: (wid: number) => Promise<any[]>; get: (id: number) => Promise<any>; create: (wid: number, d: any) => Promise<any>; update: (id: number, d: any) => Promise<any>; remove: (id: number) => Promise<any> }
       graph: { get: (wid: number, mode: any, sort?: number) => Promise<any> }
       ai: { status: () => Promise<any>; outline: (wid: number) => Promise<any>; analyzeChapter: (cid: number) => Promise<any> }
+      window: { minimize: () => Promise<any>; maximizeToggle: () => Promise<any>; close: () => Promise<any>; isMaximized: () => Promise<any> }
       meta: { platform: string }
     }
   }

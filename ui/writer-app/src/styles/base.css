@@ -28,6 +28,11 @@ button {
   cursor: pointer;
 }
 
+/* TRAE 风：控件统一柔和圆角，无硬黑描边 */
+button, input, select, textarea {
+  border-radius: var(--radius-md);
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar) transparent;

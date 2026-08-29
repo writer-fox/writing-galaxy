@@ -56,6 +56,13 @@ contextBridge.exposeInMainWorld('wxAPI', {
     outline: invoke('ai:outline'),
     analyzeChapter: invoke('ai:analyzeChapter'),
   },
+  // 窗口控制（无边框标题栏用；返回 Promise 便于知道结果）
+  window: {
+    minimize: () => ipcRenderer.invoke('window:minimize').then(() => true),
+    maximizeToggle: () => ipcRenderer.invoke('window:maximize-toggle').then((v) => !!v),
+    close: () => ipcRenderer.invoke('window:close').then(() => true),
+    isMaximized: () => ipcRenderer.invoke('window:is-maximized').then((v) => !!v),
+  },
   // 元信息
   meta: { platform: process.platform, versions: process.versions },
 })

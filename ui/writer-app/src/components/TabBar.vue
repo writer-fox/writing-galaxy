@@ -102,12 +102,12 @@ function onBarClickCapture(e: MouseEvent) {
 <style scoped>
 .tabbar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
   background: var(--bg-sidebar);
   border-bottom: 1px solid var(--border);
-  height: 36px;
-  padding: 0 6px;
-  gap: 2px;
+  height: 38px;
   overflow-x: auto;
   flex-shrink: 0;
 }
@@ -115,22 +115,28 @@ function onBarClickCapture(e: MouseEvent) {
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
-  padding: 0 10px;
-  margin-top: 4px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-bottom: none;
-  border-radius: 7px 7px 0 0;
+  height: 28px;
+  padding: 0 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill);
   color: var(--fg-muted);
   font-size: 12px;
   white-space: nowrap;
   user-select: none;
+  transition: background 0.14s ease, color 0.14s ease;
 }
-.tab.active { color: var(--fg); border-bottom: 2px solid var(--accent); background: var(--bg-panel); margin-bottom: -1px; }
-.tab:hover { color: var(--fg); }
+.tab.active {
+  color: var(--fg);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-card);
+}
+.tab:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
 .tab.dragging { opacity: 0.55; box-shadow: var(--shadow); position: relative; z-index: 5; transform: scale(1.02); }
-.tab .tic { color: var(--accent); }
+.tab .tic { color: var(--accent); font-size: 12px; }
 .lbl { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 .close {
   width: 16px;
