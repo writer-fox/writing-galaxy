@@ -1,7 +1,7 @@
 # 写作星河 · 开发指南
 
-> 面向网文作者的写作辅助工具:章节编辑 + 一键大纲 + 3D 人物/势力关系图(上帝视角 + 时间轴)。
-> 本指南面向开发者:如何构建、运行、扩展,以及当前迭代的并行开发计划。
+> 面向网文作者的本地桌面写作软件：章节编辑 + 一键大纲 + 3D 人物/势力关系图（上帝视角 + 时间轴）。
+> **Electron 桌面应用**（Vue3 + TS + better-sqlite3 本地直存，无独立后端进程）。
 
 ---
 
@@ -9,159 +9,121 @@
 
 | 层 | 选型 | 说明 |
 | --- | --- | --- |
-| 前端 | Vue 3 + TypeScript + Vite + Pinia | 四栏布局 / tab / 双主题 / CodeMirror 6 / 3d-force-graph |
-| 后端 | Spring Boot 3.2 + Java 17 | JdbcTemplate(对齐 SQLite 单机零摩擦,暂不引 ORM) |
-| 数据库 | SQLite(JDBC,单文件 `backend/data/writer.db`) | 单机为主;可选云同步时再上 PostgreSQL |
-| LLM | GLM-4 优先 / DeepSeek 次之(provider 抽象,可配置) | 未配 key 时接口返回明确提示,不阻塞非 AI 功能 |
+| 窗口壳 | Electron | 无边框自定义标题栏 + 圆角容器，跨 Win/macOS/Linux |
+| 前端 | Vue 3 + TypeScript + Vite + Pinia | 四栏布局 / tab / 双主题（浅 TRAE 风 / 深星夜风）/ CodeMirror 6 / 3d-force-graph |
+| 本地数据 | better-sqlite3（主进程） | 单文件库，经 IPC 供渲染进程读写 |
+| LLM | 主进程直连外部 API（GLM-4 优先 / DeepSeek） | 通过环境变量 `LLM_API_KEY` 等配置 |
 
 ## 2. 目录结构
 
 ```
 写作星河/
-├── 技术方案.md        # 产品/数据模型/接口契约(权威)
-├── UI设计文档.md       # 设计规范(tokens/布局/交互)
-├── DEVELOP.md         # 本文档
-├── backend/           # Spring Boot + SQLite
-│   ├── pom.xml        # Maven(mvnw wrapper 自带)
-│   └── src/main/java/com/writer/
-│       ├── controller/  # REST 接口
-│       ├── service/     # 业务逻辑(sort_order 重排等)
-│       ├── dao/         # JdbcTemplate 数据访问
-│       ├── model/       # record 模型 + 请求体
-│       └── config/      # SqliteBootstrap / DemoDataSeeder
+├── 技术方案.md          # 产品/数据模型（权威）
+├── UI设计文档.md         # 设计规范（tokens/布局/交互）
+├── DEVELOP.md           # 本文档
 └── ui/
-    ├── prototype/     # 早期静态原型(设计参照,已弃用)
-    └── writer-app/    # Vite + Vue3 + TS 前端工程
-        └── src/
-            ├── api.ts           # 后端 REST 客户端(唯一出口)
-            ├── stores/          # Pinia:data(章节)/graph/tabs/theme/persistence
-            ├── components/      # 布局组件 + panes(编辑器/大纲/关系图)
-            └── composables/     # 布局拖拽
+    └── writer-app/      # Electron + Vue 前端工程（唯一工程）
+        ├── electron/            # Electron 主进程（commonjs）
+        │   ├── main.js          # 窗口创建 + IPC 注册 + 渲染诊断
+        │   ├── preload.js       # contextBridge 安全桥（exposeInMainWorld wx）
+        │   ├── db.js            # better-sqlite3 建库建表 + 演示数据
+        │   └── store.js         # 数据操作层（CRUD / sort_order 重排 / graph 组装 / AI）
+        ├── src/
+        │   ├── api.ts           # 数据出口：IPC 优先，浏览器回退 REST
+        │   ├── stores/          # Pinia：works/data/cast/graph/tabs/theme/aichat
+        │   ├── components/      # 布局组件 + panes（编辑器/大纲/关系图/设定集）
+        │   └── styles/          # tokens.css（双主题）/ base.css
+        ├── index.html           # Vite 入口
+        ├── vite.config.ts       # base='./'（关键：Electron file:// 加载相对资源）
+        └── package.json         # 含 electron-builder 打包配置
 ```
 
 ## 3. 构建与运行
 
-### 3.0 一键运行(最简便,推荐)
-
-> 根目录已提供两个一键脚本,Windows 双击即用,无需手动敲命令:
-
-| 脚本 | 用途 | 效果 |
-| --- | --- | --- |
-| **`dev.cmd`** | 开发模式 | 自动确保后端 jar + 前端依赖 → 新窗口起后端(8080)→ 前端 dev(5173,改代码自动刷新)→ 打开浏览器 |
-| **`start.cmd`** | 生产模式 | 自动确保后端 jar + 前端 dist(缺失则构建)→ 后端(8080)+ vite preview(4173)→ 打开浏览器 |
-
-```text
-双击 dev.cmd                    # 日常开发(自动刷新,推荐)
-dev.cmd rebuild                 # 改过后端代码后,强制重编 jar 再启动
-双击 start.cmd                  # 演示/交付(静态构建,无自动刷新)
-```
-
-首次运行会稍慢(需编译后端、安装前端依赖);之后秒开。
-**退出方式**:关闭弹出的两个命令行窗口即可。
-> 说明:脚本内容使用英文输出(Windows `cmd` 批处理编码限制)——为避免中文在 cmd 下乱码导致命令解析失败,脚本提示语为英文;中文目录名 `写作星河` 不受影响,由 `%~dp0` 正确处理。
-
-### 3.1 后端
-
-```bash
-cd backend
-./mvnw.cmd -DskipTests package          # 打 jar(首次需网络拉依赖)
-java -jar target/writer-backend.jar      # 启动,监听 8080
-```
-
-- 数据文件 `backend/data/writer.db` 首次启动自动建库;`schema.sql` 幂等。
-- `DemoDataSeeder` 在库空时写入示例作品「大泽界」+ 人物/势力/关系,便于联调。
-
-### 3.2 前端
+### 3.1 开发运行（热更新 + 桌面窗口）
 
 ```bash
 cd ui/writer-app
-npm install        # 首次
-npm run dev        # 开发服务器 http://localhost:5173(后端需已启动)
-npm run build      # 生产构建(vue-tsc 类型检查 + vite build,必须全绿)
+npm install
+npm run electron:dev     # 起 Vite(5173) + Electron 加载 dev 服务器，改代码自动刷新
 ```
 
-- 后端地址由 `VITE_API_BASE` 环境变量覆盖,默认 `http://localhost:8080`。
-- 前端**不做 mock 兜底**:后端不可用时明确报错提示(除 3D 图演示保留了 mock 分支)。
+### 3.2 只跑前端（浏览器预览，后端/数据不可用）
 
-### 3.3 依赖工具
+```bash
+npm run dev              # 浏览器 http://localhost:5173（此时 IPC 不可用，见 api.ts 回退）
+```
 
-- Maven 本地副本 `.tools/apache-maven-3.9.9`(仓库内不提交);`mvnw` wrapper 优先。
-- Node 20+ / npm 10+。
+### 3.3 生产构建 + 打包
+
+```bash
+npm run build            # vue-tsc 类型检查 + vite build → dist/
+npm run dist:win         # build + electron-builder 打 Windows NSIS 安装包
+npm run dist             # 全平台（当前平台）
+npm run dist:dir         # 免安装目录（release/win-unpacked）
+```
+
+产物：
+- 安装包：`ui/writer-app/release/写作星河-0.1.0-x64.exe`
+- 免安装版：`ui/writer-app/release/win-unpacked/写作星河.exe`
+
+### 3.4 LLM 配置（可选，未配置时 AI 返回明确提示）
+
+```bash
+set LLM_API_KEY=xxx        # Windows
+LLM_API_KEY=xxx            # macOS/Linux
+# 可选项：LLM_BASE_URL（默认 deepseek）、LLM_MODEL（默认 deepseek-chat）
+```
 
 ## 4. 架构与数据流
 
 ```
-前端(Vue3) ── REST ──> 后端(Spring Boot) ──> SQLite
-    ▲                     │
-    └──── 3D 图数据 <─────┘  /works/{id}/graph?mode=god|timeline&sort=N
+渲染进程(Vue) ──wxAPI(IPC)──> 主进程 ──better-sqlite3──> writing-galaxy.db(本地)
+        ▲                                                     （用户数据目录）
+        └──────── AI 直连外部 LLM API（主进程发起，避免渲染进程直连/nge利 key）
 ```
 
-- **sort_order 是唯一稳定坐标**:章节插入/删除后事务内全量紧凑重排为 1,2,3…;人物出场、关系起止、章纲关联全部以 `sort_order` 索引(对齐方案 4.2,禁止再用 `chapter_no`)。
-- **数据所有权在后端**:前端不持久化业务数据,localStorage 仅存 UI 偏好(主题/tab)。
-- **LLM 仅后端调用**:避免 key 泄露,前端只调 `/api/ai/*`。
+- **无后端进程**：单进程桌面应用，数据全部存本地 SQLite（`app.getPath('userData')/data/writing-galaxy.db`）。
+- **IPC 封装**：`preload.js` 暴露 `window.wxAPI`；`api.ts` 检测到 `wxAPI` 走 IPC，否则浏览器回退 REST（开发预览用）。
+- **sort_order 是唯一稳定坐标**：章节插入/删除后事务内全量紧凑重排为 1,2,3…；人物出场/关系起止/章纲关联全部以 `sort_order` 索引（对齐方案 4.2，禁止用 chapter_no）。
+- **无边框窗口**：`main.js` 设 `frame:false`，前端 `TitleBar.vue` 自绘标题栏（拖拽 + 最小化/最大化/关闭），窗口控制走 IPC。
+- **双主题**：`tokens.css` 两套 `html[data-theme]`（浅 TRAE / 深星夜），theme store 持久化到 localStorage。
 
-## 5. API 契约(已实现 + 迭代目标)
+## 5. 数据模型（SQLite 表，见 electron/db.js）
 
-| 方法 | 路径 | 状态 |
-| --- | --- | --- |
-| GET/POST | `/api/works`、`/api/works/{id}` | ✅ |
-| GET | `/api/works/{id}/tree` | ✅ 章节树 |
-| GET/POST/PUT/DELETE | `/api/chapters[/{id}]` | ✅ 含 sort_order 重排 |
-| GET | `/api/works/{id}/graph?mode=&sort=` | ✅ god/timeline |
-| GET/POST | `/api/works/{id}/characters` | ✅ 人物列表/新建 |
-| PUT/DELETE | `/api/characters/{id}` | ✅ 人物修正/删除(级联清关系) |
-| GET/POST | `/api/works/{id}/factions` | ✅ 势力列表/新建 |
-| PUT/DELETE | `/api/factions/{id}` | ✅ 势力修正/删除(解除归属) |
-| GET/POST | `/api/works/{id}/relationships` | ✅ 关系列表/新建 |
-| PUT | `/api/relationships/{id}/confirm` | ✅ 关系人工确认 |
-| DELETE | `/api/relationships/{id}` | ✅ 关系删除 |
-| GET/POST | `/api/works/{id}/outline` | ✅ 大纲树/新建 |
-| PUT/DELETE | `/api/outline/{id}` | ✅ 大纲修正/删除(级联子节点) |
-| POST | `/api/ai/outline` | ✅ 生成大纲(provider 有效时) |
-| POST | `/api/ai/analyze-chapter` | ✅ 单章关系抽取(provider 有效时) |
-| GET | `/api/ai/status` | ✅ 配置状态(LLM 是否已配 key) |
+- **work** 作品
+- **chapter** 章节（`(work_id, sort_order)` 唯一）
+- **character** 人物（faction_id 归属、first_sort_order 出场坐标、confirmed）
+- **faction** 势力（parent_faction_id 可嵌套）
+- **relationship** 关系（from/to 类型、rel_type、start/end 坐标）
+- **outline_node** 大纲三层树（level 0/1/2）
 
-> 响应格式与图数据 JSON 严格对齐 `技术方案.md` 第 4.3 节;关系 `rel_type` 枚举、颜色映射见方案 4.2.6。
+关系 `rel_type` 枚举与颜色映射见 `store.js` 的 `REL_META`，与 `技术方案.md` 4.2.6 一致。
 
 ## 6. 开发约定
 
-1. **命名**:后端 record 模型 + `CreateXxxRequest` 请求体;DAO 用 `JdbcTemplate` + 静态 `RowMapper`;Controller 统一 `@CrossOrigin("*")` + `ResponseEntity<?>` 处理 404/400。
-2. **错误处理**:缺失资源返回 `404`;参数非法返回 `400` + `{"message": "…"}`;不做全局异常拦截,保持简单。
-3. **事务**:涉及重排/级联的操作加 `@Transactional`(如 `ChapterService.renumber`)。
-4. **SQLite 兼容**:`BIGINT` 列可能返回 `Integer`,DAO 统一走 `GraphDao.oL()` 式的安全转换;布尔用 `INTEGER 0/1`。
-5. **前端**:数据访问只经 `api.ts`;Pinia store 持状态;组件内不直接 fetch。
-6. **类型安全**:`npm run build`(vue-tsc)必须零错误——未使用的导入、隐式 any 都要清掉。
-7. **提交**:小而语义化 commit(feat:/fix:),改动后跑构建验证再提交。
+1. **Electron 主进程用 CommonJS**：`electron/package.json` 声明 `"type":"commonjs"`（因 `writer-app/package.json` 是 `"type":"module"`，.js 默认按 ESM 会报 `require is not defined`）。
+2. **原生模块**：`better-sqlite3` 装在 `dependencies`（electron-builder 只打包 dependencies）；改 Electron 版本后需 `npx electron-rebuild -f -w better-sqlite3`（或由 electron-builder 自动 rebuild）。
+3. **Vite 资源相对路径**：`vite.config.ts` 的 `base:'./'` 不能去掉，否则 Electron `file://` 下 `/assets/...` 加载失败 → 白屏。
+4. **数据出口唯一**：前端只经 `api.ts`；Pinia store 持状态；组件内不直接 IPC。
+5. **类型安全**：`npm run build`（vue-tsc）必须零错误。
+6. **提交**：小而语义化 commit（feat:/fix:），改动后跑构建验证再提交。
 
-## 7. 当前迭代记录(上一轮已完成)
+## 7. 常见问题（已踩过的坑）
 
-> 上一轮按并行分组完成 M1(人物/势力/关系 CRUD)+ 大纲 + 设定集 + AI 接口骨架,并让前端全量对接后端。已提交 `6eed733` 并推送。
+| 现象 | 原因 | 解决 |
+| --- | --- | --- |
+| 窗口空白 | dist 资源是绝对路径 `/assets/`，file:// 下加载失败 | `vite.config.ts` `base:'./'` 产相对路径 |
+| `require is not defined` | `.js` 被当 ESM（package.json type:module） | `electron/package.json` 声明 commonjs |
+| `NODE_MODULE_VERSION` 不匹配 | better-sqlite3 用 Node ABI 编译 | `electron-rebuild` 重编为 Electron ABI |
+| Electron 二进制下载超时 | 官方源被墙 | `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/` |
+| 打包证书校验失败 | 网络代理 | `NODE_TLS_REJECT_UNAUTHORIZED=0` + 国内 electron-builder 镜像 |
+| 旧版残留导致新装空白/无反应 | 旧进程/旧快捷方式占用 | 卸载旧版 + 结束所有写作星河.exe 进程 |
 
-```
-组① 后端(并行)  ✅
-  A1 人物/势力/关系 CRUD       CastDao/CastController + 请求模型
-  A2 大纲 outline CRUD         OutlineDao/OutlineController + 请求模型
-  A3 AI provider + 接口骨架     LlmProvider 抽象 + AiController(/api/ai/*)
+## 8. 验收标准
 
-组② 前端(立即开工)  ✅
-  B1 api.ts 补全全部接口        按后端契约实现全部 REST 客户端
-  B2 作品库面板 + 章节切后端     works store;ActivityBar 作品库浮层;data store 走后端
-
-组③ 前端(依赖组①)  ✅
-  B3 设定集面板                 cast store + SettingPane(人物/势力/关系增删改/确认,联动 3D)
-  B4 大纲 + AI 面板接后端        aichat store;OutlinePane 大纲树;AiPanel 接入 /api/ai
-
-组④ 联调  ✅
-  C1 全链路冒烟(graph-smoke 断言 PASSED + 建势力/人物/关系→图即时反映→确认→级联删除)
-  C2 mvn package 成功 + npm build 成功 + vue-tsc 零错误
-  C3 提交并推送 origin/master
-```
-
-## 8. 验收标准(联调冒烟清单)
-
-1. 新建作品 → 出现在作品库;切换作品,内容树跟随。
-2. 新建章节(尾部/指定位置插入)→ sort_order 自动压实;编辑标题/正文保存后重开仍在。
-3. 手动新建人物/势力/关系 → 3D 图出现对应节点/边;确认/删除后图随之更新。
-4. 时间轴拖动 → 节点/边按出场坐标渐入渐出。
-5. 大纲视图展示三层树;AI「生成大纲/分析本章」在未配 key 时返回明确提示,不崩溃。
-6. `npm run build` 零错误;`mvn -DskipTests package` 成功;后端冒烟脚本全部 2xx。
+1. `npm run electron:dev` 弹出桌面窗口，浅色 TRAE 界面 + 顶部自定义标题栏。
+2. 可新建作品 → 章节增删/编辑 → 人物/势力/关系管理 → 3D 关系图 + 时间轴联动。
+3. 主题切换生效（浅/深）且持久化。
+4. 标题栏最小化/最大化/关闭可用；AI 未配 key 时返回友好提示不崩溃。
+5. `npm run build` 零错误；`npm run dist:win` 产出安装包，安装后独立运行。

@@ -2,7 +2,7 @@
 
 > 面向网文作者的一键大纲 + 3D 人物/势力关系图写作工具。
 > 本设计定位：**IDE 系（VSCode / Trae 风格）视觉语言 + 双主题（亮/暗）+ 弱人机感**。
-> 配套原型见 `ui/prototype/index.html`（静态、可点、可切换主题）。
+> 落地实现：`ui/writer-app`（Electron 桌面应用，UI 外壳在 `src/components` 与 `src/styles/tokens.css`）。
 
 ---
 
@@ -271,10 +271,10 @@ ui/writer-app/
       CodeMirrorEditor.vue     # CodeMirror 6 封装（markdown、随主题 reconfigure）
       panes/EditorPane.vue     # 章节编辑器页
       panes/OutlinePane.vue    # 大纲视图
-      panes/GraphPane.vue      # 3D 关系图（当前 SVG 占位 + 时间轴 scrubber）
+      panes/GraphPane.vue      # 3D 关系图（3d-force-graph + 时间轴 scrubber）
 ```
 
-> 备注：关系图当前用 SVG 占位示意，正式接入 `3d-force-graph`（方案 3.2）时替换 `panes/GraphPane.vue` 内部渲染，其余结构不变。
+> 关系图已接入 `3d-force-graph`（方案 3.2），配合星夜风 + 时间轴联动；见 `panes/RelationGraph3D.vue`。
 
 ---
 
@@ -301,10 +301,10 @@ ui/writer-app/
 
 ---
 
-## 10. 静态原型说明
+## 10. 落地实现说明
 
-`ui/prototype/index.html` 为早期静态原型（纯 HTML，无 Vite），已被 `ui/writer-app` 取代，保留作设计参照。
-- 纯静态、无依赖、双击打开。
-- 可切换亮/暗主题（persist localStorage）。
-- 交互演示：Tab 切换、点内容树开 Tab、关系图模式切换、抽屉开合、快捷入口。
+设计已落地于 `ui/writer-app`（Electron 桌面应用）：
+- 双主题设计令牌见 `src/styles/tokens.css`（浅 TRAE 风 / 深星夜风，`data-theme` 切换）。
+- 四栏布局/标题栏/Tab/卡片样式见 `src/components/`。
+- 交互与规则：分栏拖拽 `composables/layout.ts`、Tab 拖拽排序 `stores/tabs.ts`、主题持久化 `stores/theme.ts`。
 
