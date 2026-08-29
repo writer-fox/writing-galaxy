@@ -49,7 +49,8 @@
       "dist/**/*",
       "electron/**/*",
       "!electron/_selftest.js",
-      "!electron/_integration.js"
+      "!electron/_integration.js",
+      "!electron/_render.test.js"
     ],
     "asarUnpack": [
       "node_modules/better-sqlite3/**/*"
