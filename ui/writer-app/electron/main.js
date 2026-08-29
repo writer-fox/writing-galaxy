@@ -41,6 +41,30 @@ function createWindow() {
     mainWin.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 
+  // 渲染诊断（生产时不影响功能，仅打日志便于排查空白问题）
+  // 渲染诊断：加载失败时在窗口内显示错误(而非白屏)，便于定位/反馈
+  mainWin.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    console.log('[WX][did-fail-load]', code, desc, url)
+    if (mainWin) {
+      mainWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(
+        '<div style="font-family:sans-serif;padding:40px;color:#333">' +
+        '<h2>界面加载失败</h2><p>错误码: ' + code + '</p><p>原因: ' + desc + '</p>' +
+        '<p>加载地址: ' + url + '</p><p>请将以上信息反馈给开发者。</p></div>'))
+    }
+  })
+  mainWin.webContents.on('did-finish-load', () => {
+    // 校验界面是否真正渲染(Vue 挂载)，非空白则正常
+    mainWin.webContents.executeJavaScript(
+      `document.getElementById('app') ? document.getElementById('app').children.length : -999`)
+      .then((kids) => { if (kids <= 0) console.log('[WX][warn] renderer empty, #app=', kids) })
+      .catch(() => {})
+  })
+  if (process.env.WX_DEBUG) {
+    mainWin.webContents.on('console-message', (_e, level, msg) => {
+      console.log('[WX][console]', level, String(msg).slice(0, 160))
+    })
+  }
+
   mainWin.on('closed', () => { mainWin = null })
 }
 
