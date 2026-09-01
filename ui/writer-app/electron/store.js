@@ -2,14 +2,28 @@
 let _db = null
 let _getDb = null
 let _configPath = null
+const dbm = require('./db')   // 存储层(每本书一个库)
 
-function bind(getDb, configPath) {
+function bind(getDb, configPath, currentBookGetter) {
   _getDb = getDb
   _configPath = configPath || null
+  if (currentBookGetter) { _currentBook = currentBookGetter }
+}
+let _currentBook = null
+
+/** 数据源：优先当前打开的书库(每书一库)，否则回退旧的单库 */
+function D() {
+  if (_currentBook) {
+    const c = _currentBook()
+    if (c) return c.db
+  }
+  return _getDb ? _getDb() : _db
 }
 
-function D() {
-  return _getDb ? _getDb() : _db
+/** 当前库中唯一的 work.id（每本书一库 → 一行） */
+function wid() {
+  const row = D().prepare('SELECT id FROM work LIMIT 1').get()
+  return row ? row.id : null
 }
 
 /* ---------- 用户配置（LLM key/model/base、可由设置页读写） ---------- */
@@ -42,7 +56,8 @@ function updateConfig(patch) {
 }
 
 /* ---------- 章节 sort_order 重排（对齐原 ChapterService.renumber） ---------- */
-function renumberChapters(workId) {
+function renumberChapters(_workId) {
+  const workId = wid() || _workId
   const rows = D().prepare('SELECT id FROM chapter WHERE work_id=? ORDER BY sort_order').all(workId)
   const d = D()
   d.pragma('defer_foreign_keys = ON')
@@ -56,23 +71,46 @@ function renumberChapters(workId) {
   tx()
 }
 
-/* ---------- 作品 ---------- */
+/* ---------- 作品（每本书 = 一个文件夹 + 独立库） ---------- */
 function listWorks() {
-  const rows = D().prepare(
-    'SELECT id, title, genre, summary, created_at AS createdAt, updated_at AS updatedAt FROM work ORDER BY created_at DESC'
-  ).all()
-  return rows
+  const books = dbm.listBooks()
+  // 标记当前打开的书
+  const cur = dbm.getCurrentBookMeta()
+  return books.map((b) => ({
+    ...b,
+    id: b.id || b.dbPath,          // 前端用作 key（dbPath 唯一）
+    isCurrent: cur ? b.dbPath === cur.dbPath : false,
+    title: b.title,
+    genre: b.genre,
+    summary: b.summary,
+    chapterCount: b.chapterCount,
+  }))
 }
 function createWork(title, genre, summary) {
-  const info = D().prepare('INSERT INTO work(title, genre, summary) VALUES(?,?,?)').run(title, genre || null, summary || null)
-  return getWork(info.lastInsertRowid)
+  const meta = dbm.createBook(title, genre, summary)
+  return meta
 }
-function getWork(id) {
-  return D().prepare('SELECT id, title, genre, summary, created_at AS createdAt, updated_at AS updatedAt FROM work WHERE id=?').get(id) || null
+function getWork(_id) {
+  return dbm.getCurrentBookMeta()
+}
+function openWork(dirPath, initFromScratch) {
+  const r = dbm.openBook(dirPath, initFromScratch)
+  return r
+}
+function closeWork() {
+  dbm.closeCurrent()
+  return true
+}
+function getWorksRoot() {
+  return dbm.getWorksRoot()
+}
+function setWorksRoot(dir) {
+  return dbm.setWorksRoot(dir)
 }
 
 /* ---------- 章节 ---------- */
-function listChapters(workId) {
+function listChapters(_workId) {
+  const workId = wid() || _workId
   return D().prepare(
     'SELECT id, work_id AS workId, sort_order AS sortOrder, title, content, word_count AS wordCount, status, analyzed_at AS analyzedAt FROM chapter WHERE work_id=? ORDER BY sort_order'
   ).all(workId)
@@ -80,7 +118,8 @@ function listChapters(workId) {
 function getChapter(id) {
   return D().prepare('SELECT id, work_id AS workId, sort_order AS sortOrder, title, content, word_count AS wordCount, status, analyzed_at AS analyzedAt FROM chapter WHERE id=?').get(id) || null
 }
-function createChapter(workId, title, afterSortOrder) {
+function createChapter(_workId, title, afterSortOrder) {
+  const workId = wid() || _workId
   const t = (title && title.trim()) || '新章节'
   const max = D().prepare('SELECT COALESCE(MAX(sort_order),0) AS m FROM chapter WHERE work_id=?').get(workId).m
   const info = D().prepare('INSERT INTO chapter(work_id, sort_order, title, content, status) VALUES(?,?,?,?,0)')
@@ -119,7 +158,8 @@ function updateChapter(id, patch) {
     .run(title, content, content ? content.length : 0, status, id)
   return getChapter(id)
 }
-function deleteChapter(workId, id) {
+function deleteChapter(_workId, id) {
+  const workId = wid() || _workId
   const cur = getChapter(id)
   if (!cur) return false
   D().prepare('DELETE FROM chapter WHERE id=?').run(id)
@@ -128,7 +168,8 @@ function deleteChapter(workId, id) {
 }
 
 /* ---------- 人物 ---------- */
-function listCharacters(workId) {
+function listCharacters(_workId) {
+  const workId = wid() || _workId
   return D().prepare(
     `SELECT id, work_id AS workId, name, aliases, faction_id AS factionId, role, description,
             avatar_color AS avatarColor, importance, first_sort_order AS firstSortOrder,
@@ -185,7 +226,8 @@ function deleteCharacter(id) {
 }
 
 /* ---------- 势力 ---------- */
-function listFactions(workId) {
+function listFactions(_workId) {
+  const workId = wid() || _workId
   return D().prepare(
     `SELECT id, work_id AS workId, name, parent_faction_id AS parentFactionId, type, description,
             color, importance, first_sort_order AS firstSortOrder, last_active_sort_order AS lastActiveSortOrder
@@ -235,7 +277,8 @@ function deleteFaction(id) {
 }
 
 /* ---------- 关系 ---------- */
-function listRelationships(workId) {
+function listRelationships(_workId) {
+  const workId = wid() || _workId
   return D().prepare(
     `SELECT id, work_id AS workId, from_id AS fromId, from_type AS fromType, to_id AS toId, to_type AS toType,
             rel_type AS relType, strength, start_sort_order AS startSortOrder, end_sort_order AS endSortOrder,
@@ -281,7 +324,8 @@ function deleteRelationship(id) {
 }
 
 /* ---------- 大纲 ---------- */
-function listOutline(workId) {
+function listOutline(_workId) {
+  const workId = wid() || _workId
   return D().prepare(
     'SELECT id, work_id AS workId, parent_id AS parentId, level, ref_sort_order AS refSortOrder, title, content, sort_order AS sortOrder FROM outline_node WHERE work_id=? ORDER BY sort_order, id'
   ).all(workId)
@@ -321,6 +365,26 @@ function deleteOutlineNode(id) {
 }
 
 /* ---------- 图数据组装（对齐原 GraphService.build） ---------- */
+/* ---------- 章节导出为 Markdown（便于备份/分享/直接读取） ---------- */
+function exportWorkToMarkdown(outDir) {
+  const meta = dbm.getCurrentBookMeta()
+  if (!meta) throw new Error('未打开作品')
+  const dirArg = outDir || meta.dir
+  const chapters = listChapters(1)
+  const title = meta.title || '作品'
+  const header = `# ${title}\n\n> 导出自 写作星河 · ${new Date().toISOString().slice(0, 10)}\n`
+  const parts = [header]
+  for (const c of chapters) {
+    parts.push(`\n## 第${c.sortOrder}章 · ${c.title}\n\n${c.content || ''}`)
+  }
+  const out = dirArg + (dirArg.endsWith('\\') || dirArg.endsWith('/') ? '' : pathMod.sep) + title.replace(/[\\/:*?"<>|]/g, '_') + '.md'
+  if (!fs.existsSync(out)) {
+    const d = pathMod.dirname(out); if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true })
+  }
+  fs.writeFileSync(out, parts.join('\n'), 'utf8')
+  return { out, count: chapters.length }
+}
+
 function buildGraph(workId, mode, sort) {
   const timeline = mode === 'timeline'
   const S = timeline ? (sort != null ? sort : Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER
@@ -444,13 +508,13 @@ function clamp(v, def) {
 // ID 前缀：与 Graph 前端一致
 module.exports = {
   bind,
-  listWorks, createWork, getWork,
+  listWorks, createWork, getWork, openWork, closeWork, getWorksRoot, setWorksRoot,
   listChapters, getChapter, createChapter, updateChapter, deleteChapter,
   listCharacters, getCharacter, createCharacter, updateCharacter, deleteCharacter,
   listFactions, getFaction, createFaction, updateFaction, deleteFaction,
   listRelationships, getRelationship, createRelationship, confirmRelationship, deleteRelationship,
   listOutline, getOutlineNode, createOutlineNode, updateOutlineNode, deleteOutlineNode,
-  buildGraph,
+  buildGraph, exportWorkToMarkdown,
   getConfig, updateConfig,
   aiStatus, aiOutline, aiAnalyzeChapter,
 }

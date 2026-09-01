@@ -15,6 +15,11 @@ contextBridge.exposeInMainWorld('wxAPI', {
     list: invoke('work:list'),
     create: invoke('work:create'),
     get: invoke('work:get'),
+    open: invoke('work:open'),
+    close: invoke('work:close'),
+    root: invoke('works:root'),
+    setRoot: invoke('works:setRoot'),
+    exportMd: invoke('works:exportMd'),
   },
   chapters: {
     listByWork: invoke('chapter:list'),
@@ -62,6 +67,9 @@ contextBridge.exposeInMainWorld('wxAPI', {
   },
   app: {
     info: invoke('app:info'),
+  },
+  dialog: {
+    openDirectory: invoke('dialog:openDirectory'),
   },
   // 窗口控制（无边框标题栏用；返回 Promise 便于知道结果）
   window: {

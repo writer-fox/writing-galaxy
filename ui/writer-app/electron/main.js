@@ -1,10 +1,11 @@
 // Electron 主进程：创建窗口 + IPC 桥 + 本地 SQLite
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const os = require('os')
 const db = require('./db')
 const store = require('./store')
+const { migrateLegacy } = require('./migrate-legacy')
 
 let mainWin = null
 
@@ -26,8 +27,9 @@ function appInfo() {
     version: app.getVersion(),
     platform: process.platform,
     execPath: process.execPath,                    // 当前软件 exe 路径
-    userDataPath: app.getPath('userData'),         // 数据根目录
-    dbPath: resolveDbPath(),                       // 数据库文件
+    userDataPath: app.getPath('userData'),         // 用户数据根目录
+    worksRoot: db.getWorksRoot(),                  // 作品根目录（可配置）
+    dbPath: resolveDbPath(),                       // （兼容旧字段）
     isPackaged: app.isPackaged,
   }
 }
@@ -97,14 +99,20 @@ function createWindow() {
 }
 
 /** 注册 IPC：渲染进程经 preload 的 wxAPI 调用 */
-function registerIpc(database) {
-  store.bind(() => database, path.join(app.getPath('userData'), 'config.json'))
+function registerIpc() {
+  // 第三个参数指向"当前打开的书库"；无打开书时 store 回退到旧单库句柄
+  store.bind(null, path.join(app.getPath('userData'), 'config.json'), db.getCurrentBookMeta)
 
   // 便捷：把 store 方法映射为 IPC 处理器（方法名即操作名）
   const handlers = {
     'work:list': () => store.listWorks(),
     'work:create': (title, genre, summary) => store.createWork(title, genre, summary),
     'work:get': (id) => store.getWork(id),
+    'work:open': (dir, init) => store.openWork(dir, init),
+    'work:close': () => store.closeWork(),
+    'works:root': () => store.getWorksRoot(),
+    'works:setRoot': (dir) => { store.setWorksRoot(dir); store.updateConfig({ worksRoot: dir }); return dir },
+    'works:exportMd': (dir) => store.exportWorkToMarkdown(dir),
 
     'chapter:list': (workId) => store.listChapters(workId),
     'chapter:get': (id) => store.getChapter(id),
@@ -166,13 +174,35 @@ function registerIpc(database) {
 
   // 应用信息（设置页展示）
   ipcMain.handle('app:info', () => ({ ok: true, data: appInfo() }))
+
+  // 目录选择框（“打开作品文件夹”用）
+  ipcMain.handle('dialog:openDirectory', async () => {
+    const r = await dialog.showOpenDialog(mainWin, {
+      properties: ['openDirectory'],
+      title: '选择作品文件夹',
+    })
+    return { ok: true, data: r.canceled ? null : r.filePaths[0] }
+  })
 }
 
 prepare()
 
 app.whenReady().then(() => {
-  const database = db.init(resolveDbPath())
-  registerIpc(database)
+  // 读取/初始化作品根目录（默认 userData/works；可由设置页配置）
+  const cfg = store.getConfig()
+  const root = (cfg && cfg.worksRoot) || path.join(app.getPath('userData'), 'works')
+  db.setWorksRoot(root)
+
+  // 一次性迁移：若有旧单库且作品目录为空，把其中的每本书拆为独立库
+  try {
+    const legacyPath = resolveDbPath()
+    const res = migrateLegacy(require('better-sqlite3'), legacyPath, root)
+    if (res && res.migrated > 0) {
+      console.log('[WX][migrate] 迁移了', res.migrated, '本书到独立目录:', res.works.map(w => w.title).join(', '))
+    }
+  } catch (e) { console.log('[WX][migrate] 迁移跳过:', e && e.message) }
+
+  registerIpc()
   createWindow()
 
   app.on('activate', () => {

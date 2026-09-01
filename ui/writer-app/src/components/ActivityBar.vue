@@ -4,7 +4,7 @@ import { useThemeStore } from '../stores/theme'
 import { useWorksStore } from '../stores/works'
 import { useDataStore, chapterLabel } from '../stores/data'
 import { useTabsStore } from '../stores/tabs'
-import type { Work } from '../api'
+import { api } from '../api'
 
 const theme = useThemeStore()
 const works = useWorksStore()
@@ -14,6 +14,7 @@ const tabs = useTabsStore()
 const libOpen = ref(false)
 const newName = ref('')
 const libError = ref<string | null>(null)
+const opening = ref(false)
 
 function toggleLib() {
   libOpen.value = !libOpen.value
@@ -34,7 +35,20 @@ async function createNew() {
   }
 }
 
-async function switchWork(w: Work) {
+/** 打开一个文件夹作为作品（有 work.db 则打开，无则自动初始化成新书） */
+async function pickFolder() {
+  libError.value = null
+  try {
+    const dir = await api.dialog.openDirectory()
+    if (!dir) return
+    const w = await works.openExisting(dir)
+    if (w) { await switchWork(w); libOpen.value = false }
+  } catch (e: any) {
+    libError.value = String(e?.message || e)
+  }
+}
+
+async function switchWork(w: any) {
   libError.value = null
   try {
     await works.selectWork(w)
@@ -52,7 +66,7 @@ async function switchWork(w: Work) {
   }
 }
 
-async function selectExisting(w: Work) {
+async function selectExisting(w: any) {
   await switchWork(w)
 }
 </script>
@@ -110,6 +124,9 @@ async function selectExisting(w: Work) {
           />
           <button class="lib-add" @click="createNew">＋</button>
         </div>
+        <button class="lib-open" @click="pickFolder" :disabled="opening">
+          📂 打开作品文件夹…
+        </button>
         <div v-if="libError" class="lib-err">{{ libError }}</div>
       </div>
     </div>
@@ -206,4 +223,17 @@ async function selectExisting(w: Work) {
 }
 .lib-add:hover { filter: brightness(1.1); }
 .lib-err { color: var(--danger); font-size: 12px; margin-top: 8px; }
+.lib-open {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.lib-open:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.lib-open:disabled { opacity: 0.5; cursor: default; }
 </style>

@@ -1,14 +1,14 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { api, type ChapterBackend, type Work } from '../api'
+import { api, type ChapterBackend } from '../api'
 import { useDataStore } from './data'
 import { useGraphStore } from './graph'
 import { useCastStore } from './cast'
 
-/** 作品与章节数据从后端驱动的来源。作品库 = 列表 + 切换 + 加载章节。 */
+/** 作品库：每本书 = 一个文件夹 + 独立库。列表 = 扫描作品根目录；选中 = 打开该库。 */
 export const useWorksStore = defineStore('works', () => {
-  const works = ref<Work[]>([])
-  const currentWork = ref<Work | null>(null)
+  const works = ref<any[]>([])
+  const currentWork = ref<any | null>(null)
   const currentWorkId = ref<number | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -27,37 +27,57 @@ export const useWorksStore = defineStore('works', () => {
 
   async function createWork(title: string, genre?: string, summary?: string) {
     const w = await api.works.create(title, genre, summary)
-    works.value = [...works.value, w]
+    await loadWorks()
     await selectWork(w)
     return w
   }
 
-  async function selectWork(work: Work) {
-    currentWork.value = work
-    currentWorkId.value = work.id
-    await loadChaptersForWork(work.id)
-    // 同步图数据
-    const graph = useGraphStore()
-    graph.setWork(work.id)
-    await graph.load('god', null).catch(() => {})
-    // 同步设定集
-    const cast = useCastStore()
-    await cast.load(work.id).catch(() => {})
+  /** 打开一个已存在的文件夹为作品；若该文件夹无 work.db，则初始化为新书 */
+  async function openExisting(dir: string) {
+    const r = await api.works.open(dir, false)
+    if (r && r.needInit) {
+      // 提示再确认初始化——此处简化为直接初始化
+      const r2 = await api.works.open(dir, true)
+      return completeOpen(dir, r2)
+    }
+    return completeOpen(dir, r)
   }
 
-  /** 把后端章节加载为前端 data store 可消费的形态，并重置 sort_order 重排。 */
-  async function loadChaptersForWork(workId: number) {
+  // 统一处理打开后的加载
+  async function completeOpen(dir: string, r: any) {
+    if (!r || r.ok === false) { error.value = (r && r.error) || '打开失败'; return null }
+    // 刷新列表并取该书元信息
+    await loadWorks()
+    const found = works.value.find((w: any) => String(w.dbPath) === String(dir + (dir.endsWith('/') ? '' : '/') + 'work.db') || String(w.dir) === dir)
+    const target = found || { dir, dbPath: dir, title: dir.split(/[\\/]/).pop() || '作品' }
+    await selectWork(target)
+    return target
+  }
+
+  async function selectWork(work: any) {
+    const r = await api.works.open(work.dbPath, true)
+    if (!r || r.ok === false && !r.needInit) {
+      error.value = (r && r.error) || '打开作品失败'
+      return
+    }
+    currentWork.value = work
+    // 每库一行 work(id 恒为当前书 id，前端存 1)；IPC 层按当前打开库解析，不再依赖此值
+    currentWorkId.value = 1
+    // 加载章节到 data store
     const data = useDataStore()
     data.loadingChapters = true
     try {
-      const chapters: ChapterBackend[] = await api.chapters.listByWork(workId)
+      const chapters: ChapterBackend[] = await api.chapters.listByWork(1)
       data.importFromBackend(chapters)
-    } finally {
-      data.loadingChapters = false
-    }
+    } finally { data.loadingChapters = false }
+    // 同步图数据
+    const graph = useGraphStore()
+    await graph.load('god', null).catch(() => {})
+    // 同步设定集
+    const cast = useCastStore()
+    await cast.load(1).catch(() => {})
   }
 
-  /** 初始化：自动选中第一个作品（若无则建一个占位空作品）。 */
   async function init() {
     if (currentWorkId.value != null) return
     try {
@@ -75,6 +95,6 @@ export const useWorksStore = defineStore('works', () => {
 
   return {
     works, currentWork, currentWorkId, loading, error,
-    loadWorks, createWork, selectWork, init,
+    loadWorks, createWork, selectWork, openExisting, init,
   }
 })

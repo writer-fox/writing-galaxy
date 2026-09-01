@@ -9,7 +9,7 @@
 declare global {
   interface Window {
     wxAPI?: {
-      works: { list: () => Promise<any[]>; create: (t: string, g?: string, s?: string) => Promise<any>; get: (id: number) => Promise<any> }
+      works: { list: () => Promise<any[]>; create: (t: string, g?: string, s?: string) => Promise<any>; get: (id: number) => Promise<any>; open: (dir: string, init?: boolean) => Promise<any>; close: () => Promise<any>; root: () => Promise<string>; setRoot: (dir: string) => Promise<any>; exportMd: (dir?: string) => Promise<any> }
       chapters: { listByWork: (wid: number) => Promise<any[]>; get: (id: number) => Promise<any>; create: (wid: number, t?: string, a?: number) => Promise<any>; update: (id: number, p: any) => Promise<any>; remove: (wid: number, id: number) => Promise<any> }
       characters: { list: (wid: number) => Promise<any[]>; create: (wid: number, d: any) => Promise<any>; update: (id: number, d: any) => Promise<any>; remove: (id: number) => Promise<any> }
       factions: { list: (wid: number) => Promise<any[]>; create: (wid: number, d: any) => Promise<any>; update: (id: number, d: any) => Promise<any>; remove: (id: number) => Promise<any> }
@@ -19,6 +19,7 @@ declare global {
       ai: { status: () => Promise<any>; outline: (wid: number) => Promise<any>; analyzeChapter: (cid: number) => Promise<any> }
       config: { get: () => Promise<any>; update: (p: any) => Promise<any> }
       app: { info: () => Promise<any> }
+      dialog: { openDirectory: () => Promise<string | null> }
       window: { minimize: () => Promise<any>; maximizeToggle: () => Promise<any>; close: () => Promise<any>; isMaximized: () => Promise<any> }
       meta: { platform: string }
     }
@@ -69,6 +70,21 @@ export const api = {
     },
     get: async (id: number): Promise<Work> => {
       const c = ipc(); if (c) return c.works.get(id); return req(`/api/works/${id}`)
+    },
+    open: async (dir: string, init?: boolean): Promise<any> => {
+      const c = ipc(); if (c) return c.works.open(dir, init); throw new Error('打开作品需在桌面环境')
+    },
+    close: async (): Promise<any> => {
+      const c = ipc(); if (c) return c.works.close(); return { ok: true }
+    },
+    root: async (): Promise<string> => {
+      const c = ipc(); if (c) return c.works.root(); return ''
+    },
+    setRoot: async (dir: string): Promise<any> => {
+      const c = ipc(); if (c) return c.works.setRoot(dir); throw new Error('设置路径需在桌面环境')
+    },
+    exportMd: async (dir?: string): Promise<any> => {
+      const c = ipc(); if (c) return c.works.exportMd(dir); throw new Error('导出需在桌面环境')
     },
   },
   chapters: {
@@ -192,6 +208,11 @@ export const api = {
   app: {
     info: async (): Promise<any> => {
       const c = ipc(); if (c) return c.app.info(); throw new Error('应用信息需在桌面环境下读取')
+    },
+  },
+  dialog: {
+    openDirectory: async (): Promise<string | null> => {
+      const c = ipc(); if (c) return c.dialog.openDirectory(); throw new Error('需在桌面环境下选择目录')
     },
   },
 }

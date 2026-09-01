@@ -10,6 +10,7 @@ interface AppInfo {
   execPath: string
   userDataPath: string
   dbPath: string
+  worksRoot?: string
   isPackaged: boolean
 }
 
@@ -17,6 +18,8 @@ const auth = useAIChatStore()
 
 const appInfo = ref<AppInfo | null>(null)
 const infoErr = ref<string | null>(null)
+const worksRoot = ref('')
+const exportMsg = ref('')
 
 // LLM 配置表单
 const llmApiKey = ref('')
@@ -24,9 +27,21 @@ const llmBaseUrl = ref('')
 const llmModel = ref('')
 const cfgSaved = ref(false)
 const cfgErr = ref<string | null>(null)
+const cfgSavedRoot = ref(false)
 
 async function loadAppInfo() {
   try { appInfo.value = await api.app.info() } catch (e: any) { infoErr.value = e?.message || String(e) }
+  try { worksRoot.value = await api.works.root() } catch {}
+}
+async function saveRoot() {
+  try { await api.works.setRoot(worksRoot.value); cfgSavedRoot.value = true; setTimeout(() => (cfgSavedRoot.value = false), 1600) } catch (e: any) { cfgErr.value = e?.message || String(e) }
+}
+async function exportMd() {
+  exportMsg.value = ''
+  try {
+    const r = await api.works.exportMd(undefined)
+    exportMsg.value = `✓ 已导出 ${r.count} 章 → ${r.out}`
+  } catch (e: any) { exportMsg.value = `导出失败: ${e?.message || e}` }
 }
 async function loadConfig() {
   try {
@@ -81,14 +96,27 @@ onMounted(() => {
 
     <section class="card">
       <h3>📁 数据与路径</h3>
+      <label>作品保存根目录（每本书=一个子文件夹）</label>
+      <div class="root-row">
+        <input v-model="worksRoot" class="mono" placeholder="作品根目录路径" />
+        <button class="primary" @click="saveRoot">保存</button>
+      </div>
+      <span v-if="cfgSavedRoot" class="saved">✓ 已保存（新建的作品将存放于此）</span>
+
       <div v-if="appInfo" class="info-list">
-        <div class="row"><span class="k">作品/数据保存位置</span><span class="v mono">{{ appInfo.dbPath }}</span></div>
+        <div class="row"><span class="k">作品根目录</span><span class="v mono">{{ worksRoot || appInfo.worksRoot }}</span></div>
+        <div class="row"><span class="k">当前作品数据库</span><span class="v mono">{{ appInfo.dbPath }}</span></div>
         <div class="row"><span class="k">当前软件路径</span><span class="v mono">{{ appInfo.execPath }}</span></div>
         <div class="row"><span class="k">用户数据目录</span><span class="v mono">{{ appInfo.userDataPath }}</span></div>
         <div class="row"><span class="k">平台</span><span class="v">{{ appInfo.platform }}</span></div>
       </div>
       <p v-if="infoErr" class="err">{{ infoErr }}</p>
       <p v-else-if="!appInfo" class="hint">正在读取应用信息…</p>
+
+      <div class="export-row">
+        <button class="ghost" @click="exportMd">⬇ 导出当前作品为 Markdown</button>
+        <span v-if="exportMsg" class="saved">{{ exportMsg }}</span>
+      </div>
     </section>
 
     <section class="card">
@@ -146,6 +174,19 @@ input:focus { outline: 2px solid var(--accent); }
   cursor: pointer;
 }
 .primary:hover { filter: brightness(1.08); }
+.ghost {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.ghost:hover { border-color: var(--accent); color: var(--accent); }
+.root-row { display: flex; gap: 8px; align-items: center; }
+.root-row input { flex: 1; }
+.export-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
 .saved { color: var(--ok); font-size: 12px; }
 .err { color: var(--danger); font-size: 12px; }
 .ai-state { margin-top: 10px; font-size: 12px; }
