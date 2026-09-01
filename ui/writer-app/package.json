@@ -1,7 +1,7 @@
 {
   "name": "writing-galaxy",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.1",
   "type": "module",
   "description": "写作星河：面向网文作者的本地写作软件（Electron 桌面版）",
   "author": "writer-fox",
@@ -65,7 +65,7 @@
           ]
         }
       ],
-      "artifactName": "写作星河-${version}-${arch}.${ext}"
+      "artifactName": "写作星河-α.${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,

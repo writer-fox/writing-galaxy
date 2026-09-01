@@ -2,13 +2,11 @@
 import { ref } from 'vue'
 import { useThemeStore } from '../stores/theme'
 import { useWorksStore } from '../stores/works'
-import { useDataStore, chapterLabel } from '../stores/data'
 import { useTabsStore } from '../stores/tabs'
 import { api } from '../api'
 
 const theme = useThemeStore()
 const works = useWorksStore()
-const data = useDataStore()
 const tabs = useTabsStore()
 
 const libOpen = ref(false)
@@ -52,13 +50,9 @@ async function switchWork(w: any) {
   libError.value = null
   try {
     await works.selectWork(w)
-    // 打开第一章
-    const first = data.sortedChapters[0]
-    if (first) {
-      tabs.openChapter(first.id, chapterLabel(first))
-    } else {
-      const ch = await data.addChapter()
-      tabs.openChapter(ch.id, chapterLabel(ch))
+    // 切书后：关闭所有指向旧作品的章节 tab，避免残留编辑旧章
+    for (const t of [...tabs.openTabs]) {
+      if (t.type === 'chapter') tabs.close(t.key)
     }
     libOpen.value = false
   } catch (e: any) {
@@ -77,7 +71,7 @@ async function selectExisting(w: any) {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="12" height="16" rx="2"/><path d="M17 4h4v16h-4"/><path d="M6 8h6M6 12h6"/></svg>
     </button>
     <button class="icon-btn" title="AI 助手">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="3.2"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="10" rx="3"/><path d="M8 7V4M16 7V4M8 12h0.01M16 12h0.01M8 7h8v-1M8 11v3M16 11v3"/><path d="M12 4v1M4 10h2M18 10h2"/></svg>
     </button>
     <button class="icon-btn" title="设置" @click="tabs.openSysSettings()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1V21a2 2 0 1 1-4 0v-.2a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3h.1a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.6 1.6 0 0 0 1 1.5h.1a1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8v.1a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.6 1.6 0 0 0-1.5 1z"/></svg>
@@ -107,7 +101,7 @@ async function selectExisting(w: any) {
             v-for="w in works.works"
             :key="w.id"
             class="lib-item"
-            :class="{ cur: works.currentWorkId === w.id }"
+            :class="{ cur: works.currentWork && works.currentWork.dbPath === w.dbPath }"
             @click="selectExisting(w)"
           >
             <span class="lib-title">{{ w.title }}</span>

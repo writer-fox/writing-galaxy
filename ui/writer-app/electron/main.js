@@ -116,9 +116,14 @@ function registerIpc() {
 
     'chapter:list': (workId) => store.listChapters(workId),
     'chapter:get': (id) => store.getChapter(id),
-    'chapter:create': (workId, title, after) => store.createChapter(workId, title, after),
+    'chapter:create': (workId, title, after, volId) => store.createChapter(workId, title, after, volId),
     'chapter:update': (id, patch) => store.updateChapter(id, patch),
     'chapter:delete': (workId, id) => store.deleteChapter(workId, id),
+
+    'volume:list': (workId) => store.listVolumes(workId),
+    'volume:create': (workId, name) => store.createVolume(workId, name),
+    'volume:rename': (id, name) => store.renameVolume(id, name),
+    'volume:moveChapter': (chapterId, volumeId) => store.moveChapterToVolume(chapterId, volumeId),
 
     'character:list': (workId) => store.listCharacters(workId),
     'character:create': (workId, data) => store.createCharacter(workId, data),

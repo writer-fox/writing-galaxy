@@ -71,6 +71,23 @@ function renumberChapters(_workId) {
   tx()
 }
 
+/** 按卷重排：每个卷内的章节分别紧凑为 1,2,3… */
+function renumberByVolume(_workId) {
+  const workId = wid() || _workId
+  const d = D()
+  const vols = d.prepare('SELECT DISTINCT volume_no AS v FROM chapter WHERE work_id=? ORDER BY v').all(workId)
+  d.pragma('defer_foreign_keys = ON')
+  const tx = d.transaction(() => {
+    for (const v of vols) {
+      const rows = d.prepare('SELECT id FROM chapter WHERE work_id=? AND volume_no=? ORDER BY sort_order').all(workId, v.v)
+      // 阶段1 取负，阶段2 设 1..N
+      d.prepare('UPDATE chapter SET sort_order = -sort_order WHERE work_id=? AND volume_no=?').run(workId, v.v)
+      rows.forEach((r, i) => { d.prepare('UPDATE chapter SET sort_order=? WHERE id=?').run(i + 1, r.id) })
+    }
+  })
+  tx()
+}
+
 /* ---------- 作品（每本书 = 一个文件夹 + 独立库） ---------- */
 function listWorks() {
   const books = dbm.listBooks()
@@ -112,40 +129,59 @@ function setWorksRoot(dir) {
 function listChapters(_workId) {
   const workId = wid() || _workId
   return D().prepare(
-    'SELECT id, work_id AS workId, sort_order AS sortOrder, title, content, word_count AS wordCount, status, analyzed_at AS analyzedAt FROM chapter WHERE work_id=? ORDER BY sort_order'
+    'SELECT id, work_id AS workId, sort_order AS sortOrder, title, content, word_count AS wordCount, status, analyzed_at AS analyzedAt, volume_no AS volumeNo FROM chapter WHERE work_id=? ORDER BY volume_no, sort_order'
   ).all(workId)
 }
 function getChapter(id) {
-  return D().prepare('SELECT id, work_id AS workId, sort_order AS sortOrder, title, content, word_count AS wordCount, status, analyzed_at AS analyzedAt FROM chapter WHERE id=?').get(id) || null
+  return D().prepare('SELECT id, work_id AS workId, sort_order AS sortOrder, title, content, word_count AS wordCount, status, analyzed_at AS analyzedAt, volume_no AS volumeNo FROM chapter WHERE id=?').get(id) || null
 }
-function createChapter(_workId, title, afterSortOrder) {
+
+/* ---------- 卷（分卷） ---------- */
+function listVolumes(_workId) {  const workId = wid() || _workId
+  const vols = D().prepare('SELECT id, work_id AS workId, name, sort_order AS sortOrder FROM volume WHERE work_id=? ORDER BY sort_order').all(workId)
+  // 统计每卷章节数
+  return vols.map((v) => {
+    const c = D().prepare('SELECT COUNT(*) AS c FROM chapter WHERE work_id=? AND volume_no=?').get(workId, v.id).c
+    return { ...v, chapterCount: c }
+  })
+}
+function createVolume(_workId, name) {
+  const workId = wid() || _workId
+  const max = D().prepare('SELECT COALESCE(MAX(sort_order),0) AS m FROM volume WHERE work_id=?').get(workId).m
+  const n = (name && name.trim()) || ('第' + (max + 1) + '卷')
+  const info = D().prepare('INSERT INTO volume(work_id, name, sort_order) VALUES(?,?,?)').run(workId, n, max + 1)
+  return getVolumeById(info.lastInsertRowid)
+}
+function getVolumeById(id) {
+  const row = D().prepare('SELECT id, work_id AS workId, name, sort_order AS sortOrder FROM volume WHERE id=?').get(id)
+  if (!row) return null
+  return row
+}
+function renameVolume(id, name) {
+  D().prepare('UPDATE volume SET name=? WHERE id=?').run((name && name.trim()) || '未命名', id)
+  return getVolumeById(id)
+}
+function ensureDefaultVolume(workId) {
+  const n = D().prepare('SELECT COUNT(*) AS c FROM volume WHERE work_id=?').get(workId).c
+  if (n === 0) { createVolume(workId, '第一卷') }
+}
+function moveChapterToVolume(chapterId, volumeId) {
+  const vol = getVolumeById(volumeId)
+  if (!vol) return null
+  D().prepare('UPDATE chapter SET volume_no=? WHERE id=?').run(vol.id, chapterId)
+  // 重排当前卷章节
+  renumberChapters(wid())
+  return getChapter(chapterId)
+}
+function createChapter(_workId, title, afterSortOrder, volumeId) {
   const workId = wid() || _workId
   const t = (title && title.trim()) || '新章节'
-  const max = D().prepare('SELECT COALESCE(MAX(sort_order),0) AS m FROM chapter WHERE work_id=?').get(workId).m
-  const info = D().prepare('INSERT INTO chapter(work_id, sort_order, title, content, status) VALUES(?,?,?,?,0)')
-    .run(workId, max + 1, t, '')
-  if (afterSortOrder != null) {
-    // 当前刚插入的在末尾；需将其移到 afterSortOrder 之后
-    // 复刻原逻辑: 从列表按位置重排
-  }
-  renumberChapters(workId)
-  // 处理插入位置: 重新定位
-  const all = listChapters(workId)
-  const moved = all.find((c) => c.id === info.lastInsertRowid)
-  if (afterSortOrder != null && moved) {
-    const rest = all.filter((c) => c.id !== moved.id)
-    let idx = -1
-    for (let i = 0; i < rest.length; i++) if (rest[i].sortOrder > afterSortOrder) { idx = i; break }
-    rest.splice(idx === -1 ? rest.length : idx, 0, moved)
-    const d = D()
-    d.pragma('defer_foreign_keys = ON')
-    d.transaction(() => {
-      d.prepare('UPDATE chapter SET sort_order = -sort_order WHERE work_id=?').run(workId)
-      rest.forEach((c, i) => { d.prepare('UPDATE chapter SET sort_order=? WHERE id=?').run(i + 1, c.id) })
-    })()
-  } else {
-    renumberChapters(workId)
-  }
+  ensureDefaultVolume(workId)
+  const volNo = volumeId || 1
+  const max = D().prepare('SELECT COALESCE(MAX(sort_order),0) AS m FROM chapter WHERE work_id=? AND volume_no=?').get(workId, volNo).m
+  const info = D().prepare('INSERT INTO chapter(work_id, sort_order, title, content, status, volume_no) VALUES(?,?,?,?,0,?)')
+    .run(workId, max + 1, t, '', volNo)
+  renumberByVolume(workId)
   return getChapter(info.lastInsertRowid)
 }
 function updateChapter(id, patch) {
@@ -510,6 +546,7 @@ module.exports = {
   bind,
   listWorks, createWork, getWork, openWork, closeWork, getWorksRoot, setWorksRoot,
   listChapters, getChapter, createChapter, updateChapter, deleteChapter,
+  listVolumes, createVolume, renameVolume, moveChapterToVolume,
   listCharacters, getCharacter, createCharacter, updateCharacter, deleteCharacter,
   listFactions, getFaction, createFaction, updateFaction, deleteFaction,
   listRelationships, getRelationship, createRelationship, confirmRelationship, deleteRelationship,

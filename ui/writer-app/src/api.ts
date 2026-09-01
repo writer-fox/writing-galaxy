@@ -10,7 +10,8 @@ declare global {
   interface Window {
     wxAPI?: {
       works: { list: () => Promise<any[]>; create: (t: string, g?: string, s?: string) => Promise<any>; get: (id: number) => Promise<any>; open: (dir: string, init?: boolean) => Promise<any>; close: () => Promise<any>; root: () => Promise<string>; setRoot: (dir: string) => Promise<any>; exportMd: (dir?: string) => Promise<any> }
-      chapters: { listByWork: (wid: number) => Promise<any[]>; get: (id: number) => Promise<any>; create: (wid: number, t?: string, a?: number) => Promise<any>; update: (id: number, p: any) => Promise<any>; remove: (wid: number, id: number) => Promise<any> }
+      chapters: { listByWork: (wid: number) => Promise<any[]>; get: (id: number) => Promise<any>; create: (wid: number, t?: string, a?: number, v?: number) => Promise<any>; update: (id: number, p: any) => Promise<any>; remove: (wid: number, id: number) => Promise<any> }
+      volumes: { list: (wid: number) => Promise<any[]>; create: (wid: number, name?: string) => Promise<any>; rename: (id: number, name: string) => Promise<any>; moveChapter: (cid: number, vid: number) => Promise<any> }
       characters: { list: (wid: number) => Promise<any[]>; create: (wid: number, d: any) => Promise<any>; update: (id: number, d: any) => Promise<any>; remove: (id: number) => Promise<any> }
       factions: { list: (wid: number) => Promise<any[]>; create: (wid: number, d: any) => Promise<any>; update: (id: number, d: any) => Promise<any>; remove: (id: number) => Promise<any> }
       relationships: { list: (wid: number) => Promise<any[]>; create: (wid: number, d: any) => Promise<any>; confirm: (id: number) => Promise<any>; remove: (id: number) => Promise<any> }
@@ -94,8 +95,8 @@ export const api = {
     get: async (id: number): Promise<ChapterBackend> => {
       const c = ipc(); if (c) return c.chapters.get(id); return req(`/api/chapters/${id}`)
     },
-    create: async (workId: number, title?: string, afterSortOrder?: number): Promise<ChapterBackend> => {
-      const c = ipc(); if (c) return c.chapters.create(workId, title, afterSortOrder)
+    create: async (workId: number, title?: string, afterSortOrder?: number, volumeId?: number): Promise<ChapterBackend> => {
+      const c = ipc(); if (c) return c.chapters.create(workId, title, afterSortOrder, volumeId)
       return req(`/api/chapters?workId=${workId}`, { method: 'POST', body: JSON.stringify({ title, afterSortOrder }) })
     },
     update: async (id: number, patch: { title?: string; content?: string; status?: number }): Promise<ChapterBackend> => {
@@ -105,6 +106,20 @@ export const api = {
     remove: async (id: number, workId: number): Promise<{ deleted: boolean }> => {
       const c = ipc(); if (c) return c.chapters.remove(workId, id)
       return req(`/api/chapters/${id}?workId=${workId}`, { method: 'DELETE' })
+    },
+  },
+  volumes: {
+    list: async (workId: number): Promise<any[]> => {
+      const c = ipc(); if (c) return c.volumes.list(workId); return []
+    },
+    create: async (workId: number, name?: string): Promise<any> => {
+      const c = ipc(); if (c) return c.volumes.create(workId, name); throw new Error('需在桌面环境')
+    },
+    rename: async (id: number, name: string): Promise<any> => {
+      const c = ipc(); if (c) return c.volumes.rename(id, name); throw new Error('需在桌面环境')
+    },
+    moveChapter: async (chapterId: number, volumeId: number): Promise<any> => {
+      const c = ipc(); if (c) return c.volumes.moveChapter(chapterId, volumeId); throw new Error('需在桌面环境')
     },
   },
   characters: {

@@ -69,6 +69,7 @@ export const useWorksStore = defineStore('works', () => {
     try {
       const chapters: ChapterBackend[] = await api.chapters.listByWork(1)
       data.importFromBackend(chapters)
+      await data.loadVolumes(1).catch(() => {})
     } finally { data.loadingChapters = false }
     // 同步图数据
     const graph = useGraphStore()

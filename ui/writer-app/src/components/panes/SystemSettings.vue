@@ -124,7 +124,7 @@ onMounted(() => {
       <div class="about">
         <div class="app-logo">✨</div>
         <div class="app-name">写作星河</div>
-        <div class="app-ver">{{ appInfo ? 'v' + appInfo.version : '' }}</div>
+        <div class="app-ver">{{ appInfo ? 'α.' + appInfo.version : '' }}</div>
         <p>面向网文作者的本地桌面写作工具 —— 章节编辑 · 一键大纲 · 3D 人物关系图</p>
       </div>
     </section>

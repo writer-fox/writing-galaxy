@@ -14,6 +14,7 @@ export interface Chapter {
   title: string
   content: string
   status: ChapterStatus
+  volumeNo?: number // 所属卷（分卷）
 }
 
 export interface OutlineItem {
@@ -29,6 +30,14 @@ export interface Note {
   id: string
   type: string
   title: string
+}
+
+export interface Volume {
+  id: number
+  workId: number
+  name: string
+  sortOrder: number
+  chapterCount: number
 }
 
 /* ---------- 数据来源 ---------- */
@@ -48,6 +57,7 @@ const STATUS_KEYS: Record<number, ChapterStatus> = { 0: '草稿', 1: '完成', 2
 
 export const useDataStore = defineStore('data', () => {
   const chapters = ref<Chapter[]>([])
+  const volumes = ref<Volume[]>([])
   const outline = ref<OutlineItem[]>(backendOutline())
   const notes = ref<Note[]>(loadFromStorage('notes', SEED_NOTES))
   const loadingChapters = ref(false)
@@ -71,8 +81,38 @@ export const useDataStore = defineStore('data', () => {
         title: c.title,
         content: c.content,
         status: STATUS_KEYS[c.status] || '草稿',
+        volumeNo: (c as any).volumeNo || 1,
       }))
     if (list.length) lastWorkId.value = list[0].workId
+  }
+
+  /** 按卷加载卷列表（切换作品时由 works store 调用）。 */
+  async function loadVolumes(workId: number) {
+    try {
+      volumes.value = await api.volumes.list(workId)
+    } catch { volumes.value = [{ id: 1, workId, name: '第一卷', sortOrder: 1, chapterCount: chapters.value.length }] }
+  }
+
+  /** 按卷分组的章节：{ volumeId: { volume, chapters } }，含一个兜底卷 */
+  const chaptersByVolume = computed(() => {
+    const map: Record<number, { volume: Volume; chapters: Chapter[] }> = {}
+    for (const v of volumes.value) map[v.id] = { volume: v, chapters: [] }
+    for (const c of chapters.value) {
+      const vn = c.volumeNo || 1
+      if (!map[vn]) map[vn] = { volume: { id: vn, workId: 0, name: '第' + vn + '卷', sortOrder: vn, chapterCount: 0 }, chapters: [] }
+      map[vn].chapters.push(c)
+    }
+    for (const vn of Object.keys(map)) map[Number(vn)].chapters.sort((a, b) => a.sortOrder - b.sortOrder)
+    return Object.values(map).sort((a, b) => a.volume.sortOrder - b.volume.sortOrder)
+  })
+
+  /** 新增一个卷 */
+  async function addVolume(name?: string): Promise<Volume | undefined> {
+    const wid = lastWorkId.value
+    if (wid == null) return
+    const v = await api.volumes.create(wid, name)
+    await loadVolumes(wid)
+    return v
   }
 
   /** 当前按 sortOrder 升序排序后的章节。 */
@@ -159,11 +199,15 @@ export const useDataStore = defineStore('data', () => {
   return {
     chapters,
     sortedChapters,
+    volumes,
+    chaptersByVolume,
     outline,
     notes,
     loadingChapters,
     lastWorkId,
     importFromBackend,
+    loadVolumes,
+    addVolume,
     chapterById,
     addChapter,
     removeChapter,

@@ -28,6 +28,12 @@ contextBridge.exposeInMainWorld('wxAPI', {
     update: invoke('chapter:update'),
     remove: invoke('chapter:delete'),
   },
+  volumes: {
+    list: invoke('volume:list'),
+    create: invoke('volume:create'),
+    rename: invoke('volume:rename'),
+    moveChapter: invoke('volume:moveChapter'),
+  },
   characters: {
     list: invoke('character:list'),
     create: invoke('character:create'),

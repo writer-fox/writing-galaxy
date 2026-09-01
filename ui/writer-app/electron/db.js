@@ -31,7 +31,14 @@ function ensureSchema(db) {
     word_count INTEGER NOT NULL DEFAULT 0,
     status     SMALLINT NOT NULL DEFAULT 0,
     analyzed_at TEXT,
+    volume_no  INTEGER NOT NULL DEFAULT 1,
     UNIQUE (work_id, sort_order)
+  );
+  CREATE TABLE IF NOT EXISTS volume (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    work_id    INTEGER NOT NULL REFERENCES work(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL DEFAULT '第一卷',
+    sort_order INTEGER NOT NULL DEFAULT 1
   );
   CREATE TABLE IF NOT EXISTS character (
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { useWorksStore } from '../stores/works'
 
+const works = useWorksStore()
 const isMax = ref(false)
 const wx = (window as any).wxAPI
 
@@ -29,6 +31,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', refreshMax))
         <path d="M19 3l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>
       </svg>
       <span class="tb-title">写作星河</span>
+      <span v-if="works.currentWork" class="tb-work">· {{ works.currentWork.title }}</span>
     </div>
     <div class="tb-controls">
       <button class="tb-btn" title="最小化" @click="min">
@@ -68,6 +71,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', refreshMax))
 }
 .tb-logo { width: 17px; height: 17px; color: var(--accent); }
 .tb-title { font-size: 12px; font-weight: 600; color: var(--fg-muted); letter-spacing: 0.3px; }
+.tb-work { font-size: 11px; color: var(--fg-faint); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tb-controls {
   -webkit-app-region: no-drag;
   display: flex;
