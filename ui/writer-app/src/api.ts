@@ -17,6 +17,8 @@ declare global {
       outline: { list: (wid: number) => Promise<any[]>; get: (id: number) => Promise<any>; create: (wid: number, d: any) => Promise<any>; update: (id: number, d: any) => Promise<any>; remove: (id: number) => Promise<any> }
       graph: { get: (wid: number, mode: any, sort?: number) => Promise<any> }
       ai: { status: () => Promise<any>; outline: (wid: number) => Promise<any>; analyzeChapter: (cid: number) => Promise<any> }
+      config: { get: () => Promise<any>; update: (p: any) => Promise<any> }
+      app: { info: () => Promise<any> }
       window: { minimize: () => Promise<any>; maximizeToggle: () => Promise<any>; close: () => Promise<any>; isMaximized: () => Promise<any> }
       meta: { platform: string }
     }
@@ -177,6 +179,19 @@ export const api = {
     analyzeChapter: async (chapterId: number): Promise<{ result: string }> => {
       const c = ipc(); if (c) return c.ai.analyzeChapter(chapterId)
       return req('/api/ai/analyze-chapter', { method: 'POST', body: JSON.stringify({ chapterId }) })
+    },
+  },
+  config: {
+    get: async (): Promise<{ llm: { apiKey?: string; baseUrl?: string; model?: string } }> => {
+      const c = ipc(); if (c) return c.config.get(); throw new Error('配置需在桌面环境下读取')
+    },
+    update: async (patch: any): Promise<any> => {
+      const c = ipc(); if (c) return c.config.update(patch); throw new Error('配置需在桌面环境下写入')
+    },
+  },
+  app: {
+    info: async (): Promise<any> => {
+      const c = ipc(); if (c) return c.app.info(); throw new Error('应用信息需在桌面环境下读取')
     },
   },
 }

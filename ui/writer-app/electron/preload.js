@@ -56,6 +56,13 @@ contextBridge.exposeInMainWorld('wxAPI', {
     outline: invoke('ai:outline'),
     analyzeChapter: invoke('ai:analyzeChapter'),
   },
+  config: {
+    get: invoke('config:get'),
+    update: invoke('config:update'),
+  },
+  app: {
+    info: invoke('app:info'),
+  },
   // 窗口控制（无边框标题栏用；返回 Promise 便于知道结果）
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize').then(() => true),

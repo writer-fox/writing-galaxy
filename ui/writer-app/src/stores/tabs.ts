@@ -1,10 +1,10 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-export type TabType = 'chapter' | 'outline' | 'graph' | 'setting'
+export type TabType = 'chapter' | 'outline' | 'graph' | 'setting' | 'sysSettings'
 
 export interface Tab {
-  key: string // 唯一键；chapter 用 ch12，outline/graph 用固定键
+  key: string // 唯一键；chapter 用 ch12，outline/graph/sysSettings 用固定键
   type: TabType
   label: string
   refKey?: string // chapter 关联章节 key
@@ -15,6 +15,7 @@ export const PANE_ID: Record<TabType, string> = {
   outline: 'pane-outline',
   graph: 'pane-graph',
   setting: 'pane-setting',
+  sysSettings: 'pane-sys-settings',
 }
 
 const PANE_LABEL: Record<TabType, string> = {
@@ -22,6 +23,7 @@ const PANE_LABEL: Record<TabType, string> = {
   outline: '大纲',
   graph: '关系图',
   setting: '设定集',
+  sysSettings: '设置',
 }
 
 export const useTabsStore = defineStore('tabs', () => {
@@ -59,6 +61,10 @@ export const useTabsStore = defineStore('tabs', () => {
     open({ key: 'setting', type: 'setting', label: PANE_LABEL.setting })
   }
 
+  function openSysSettings() {
+    open({ key: 'sysSettings', type: 'sysSettings', label: PANE_LABEL.sysSettings })
+  }
+
   function activate(key: string) {
     if (openTabs.value.some((t) => t.key === key)) activeKey.value = key
   }
@@ -93,6 +99,7 @@ export const useTabsStore = defineStore('tabs', () => {
     openOutline,
     openGraph,
     openSetting,
+    openSysSettings,
     activate,
     close,
     reorder,

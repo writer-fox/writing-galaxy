@@ -1,13 +1,44 @@
 // 本地数据操作层：把原 Spring Controller/Service 逻辑移植到 better-sqlite3
 let _db = null
 let _getDb = null
+let _configPath = null
 
-function bind(getDb) {
+function bind(getDb, configPath) {
   _getDb = getDb
+  _configPath = configPath || null
 }
 
 function D() {
   return _getDb ? _getDb() : _db
+}
+
+/* ---------- 用户配置（LLM key/model/base、可由设置页读写） ---------- */
+const fs = require('fs')
+const pathMod = require('path')
+const DEFAULT_CFG = { llm: { apiKey: '', baseUrl: '', model: '' } }
+
+function readConfig() {
+  if (!_configPath || !fs.existsSync(_configPath)) return JSON.parse(JSON.stringify(DEFAULT_CFG))
+  try { return { ...JSON.parse(JSON.stringify(DEFAULT_CFG)), ...JSON.parse(fs.readFileSync(_configPath, 'utf8')) } }
+  catch { return JSON.parse(JSON.stringify(DEFAULT_CFG)) }
+}
+function writeConfig(cfg) {
+  if (!_configPath) throw new Error('配置路径未初始化')
+  const dir = pathMod.dirname(_configPath)
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(_configPath, JSON.stringify(cfg, null, 2), 'utf8')
+  return cfg
+}
+function getConfig() {
+  return readConfig()
+}
+function updateConfig(patch) {
+  const cur = readConfig()
+  const cfg = {
+    ...cur,
+    llm: { ...(cur.llm || {}), ...(patch.llm || {}) },
+  }
+  return writeConfig(cfg)
 }
 
 /* ---------- 章节 sort_order 重排（对齐原 ChapterService.renumber） ---------- */
@@ -349,9 +380,23 @@ function buildGraph(workId, mode, sort) {
   }
 }
 
-/* ---------- AI（主进程直连 LLM，代替原 Spring 后的外部请求） ---------- */
+/* ---------- AI（主进程直连 LLM） ---------- */
+/** 解析 LLM 配置：优先环境变量，其次用户配置文件(设置页写入) */
+function llmConf() {
+  const cfg = readConfig() || {}
+  const llm = cfg.llm || {}
+  return {
+    apiKey: process.env.LLM_API_KEY || llm.apiKey || '',
+    baseUrl: process.env.LLM_BASE_URL || llm.baseUrl || '',
+    model: process.env.LLM_MODEL || llm.model || '',
+  }
+}
 function aiStatus() {
-  return { configured: !!(process.env.LLM_API_KEY || ''), summary: 'LLM via Electron main process' }
+  const c = llmConf()
+  return {
+    configured: !!(c.apiKey || ''),
+    summary: c.apiKey ? `已配置 LLM（model: ${c.model || '默认'}）` : '未配置 LLM API（可在设置页填写）',
+  }
 }
 async function aiOutline(workId) {
   const chapters = listChapters(workId)
@@ -370,13 +415,13 @@ async function aiAnalyzeChapter(chapterId) {
   )
 }
 async function callLlm(system, user) {
-  const key = process.env.LLM_API_KEY || ''
-  if (!key) throw new Error('LLM 未配置：请在环境变量设置 LLM_API_KEY')
-  const base = process.env.LLM_BASE_URL || 'https://api.deepseek.com/v1'
-  const model = process.env.LLM_MODEL || 'deepseek-chat'
+  const conf = llmConf()
+  if (!conf.apiKey) throw new Error('LLM 未配置：请到「设置」填写 API Key')
+  const base = conf.baseUrl || 'https://api.deepseek.com/v1'
+  const model = conf.model || 'deepseek-chat'
   const res = await fetch(base.replace(/\/$/, '') + '/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + conf.apiKey },
     body: JSON.stringify({
       model,
       messages: [
@@ -406,5 +451,7 @@ module.exports = {
   listRelationships, getRelationship, createRelationship, confirmRelationship, deleteRelationship,
   listOutline, getOutlineNode, createOutlineNode, updateOutlineNode, deleteOutlineNode,
   buildGraph,
+  getConfig, updateConfig,
   aiStatus, aiOutline, aiAnalyzeChapter,
 }
+

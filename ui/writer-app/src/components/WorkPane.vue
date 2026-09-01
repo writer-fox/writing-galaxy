@@ -5,6 +5,7 @@ import EditorPane from './panes/EditorPane.vue'
 import OutlinePane from './panes/OutlinePane.vue'
 import GraphPane from './panes/GraphPane.vue'
 import SettingPane from './panes/SettingPane.vue'
+import SystemSettings from './panes/SystemSettings.vue'
 import { useTabsStore } from '../stores/tabs'
 import { useDataStore } from '../stores/data'
 import { useWorksStore } from '../stores/works'
@@ -45,6 +46,7 @@ const breadTitle = computed(() => {
       <OutlinePane v-else-if="activeType === 'outline'" class="pane" />
       <GraphPane v-else-if="activeType === 'graph'" class="pane" />
       <SettingPane v-else-if="activeType === 'setting'" class="pane" />
+      <SystemSettings v-else-if="activeType === 'sysSettings'" class="pane" />
       <div v-else class="pane empty"><p class="ghost">从右侧内容树或 AI 栏打开内容。</p></div>
     </div>
   </main>

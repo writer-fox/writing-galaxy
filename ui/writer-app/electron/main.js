@@ -8,6 +8,10 @@ const store = require('./store')
 
 let mainWin = null
 
+// 固定应用与数据目录名，保证开发/打包/各平台路径一致
+app.setName('writing-galaxy')
+const APP_DATA_NAME = 'writing-galaxy'
+
 /** 数据文件放在用户数据目录下（独立于安装位置的本地文件） */
 function resolveDbPath() {
   const dir = path.join(app.getPath('userData'), 'data')
@@ -15,9 +19,30 @@ function resolveDbPath() {
   return path.join(dir, 'writing-galaxy.db')
 }
 
+/** 应用信息（供设置页展示：软件路径、数据路径、版本、平台） */
+function appInfo() {
+  return {
+    name: app.getName(),
+    version: app.getVersion(),
+    platform: process.platform,
+    execPath: process.execPath,                    // 当前软件 exe 路径
+    userDataPath: app.getPath('userData'),         // 数据根目录
+    dbPath: resolveDbPath(),                       // 数据库文件
+    isPackaged: app.isPackaged,
+  }
+}
+
 function isDev() {
   return !app.isPackaged || !!process.env.VITE_DEV_SERVER_URL
 }
+
+function prepare() {
+  // Electron 开发模式下 userData 默认是 "Electron"；统一改为 writing-galaxy，避免路径漂移
+  if (process.env.VITE_DEV_SERVER_URL || !app.isPackaged) {
+    app.setPath('userData', path.join(app.getPath('appData'), APP_DATA_NAME))
+  }
+}
+
 
 function createWindow() {
   mainWin = new BrowserWindow({
@@ -73,7 +98,7 @@ function createWindow() {
 
 /** 注册 IPC：渲染进程经 preload 的 wxAPI 调用 */
 function registerIpc(database) {
-  store.bind(() => database)
+  store.bind(() => database, path.join(app.getPath('userData'), 'config.json'))
 
   // 便捷：把 store 方法映射为 IPC 处理器（方法名即操作名）
   const handlers = {
@@ -113,6 +138,9 @@ function registerIpc(database) {
     'ai:status': () => store.aiStatus(),
     'ai:outline': (workId) => store.aiOutline(workId),
     'ai:analyzeChapter': (chapterId) => store.aiAnalyzeChapter(chapterId),
+
+    'config:get': () => store.getConfig(),
+    'config:update': (patch) => store.updateConfig(patch),
   }
 
   Object.entries(handlers).forEach(([channel, fn]) => {
@@ -135,7 +163,12 @@ function registerIpc(database) {
   ipcMain.handle('window:close', async () => { mainWin?.close(); return { ok: true } })
   ipcMain.handle('window:is-maximized', () =>
     ({ ok: true, data: mainWin ? mainWin.isMaximized() : false }))
+
+  // 应用信息（设置页展示）
+  ipcMain.handle('app:info', () => ({ ok: true, data: appInfo() }))
 }
+
+prepare()
 
 app.whenReady().then(() => {
   const database = db.init(resolveDbPath())
